@@ -14,8 +14,10 @@ ARCHIVE="$ROOT/dist/Dashboard-Buyers-macos.tar.gz"
 [[ -f "$ROOT/web/dist/index.html" ]] || { echo "Нет web/dist — сначала: cd web && npm run build" >&2; exit 1; }
 
 cd "$ROOT/macos"
-swift build -c release
-BIN_DIR="$(swift build -c release --show-bin-path)"
+# Универсальный бинарник: работает на Apple Silicon и Intel, где бы ни собирался.
+ARCHS=(--arch arm64 --arch x86_64)
+swift build -c release "${ARCHS[@]}"
+BIN_DIR="$(swift build -c release "${ARCHS[@]}" --show-bin-path)"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/web"
@@ -38,6 +40,7 @@ plutil -lint "$APP/Contents/Info.plist"
 # Подпись ad-hoc: приложение для одного Mac, без Apple Developer ID (см. docs/adr/0003).
 codesign --force --sign - --timestamp=none "$APP"
 codesign --verify --verbose "$APP"
+lipo -info "$APP/Contents/MacOS/PiranhasDashboard"
 
 tar -C "$ROOT/dist" -czf "$ARCHIVE" "$APP_NAME"
 echo "Готово: $APP (версия $VERSION, сборка $BUILD)"
