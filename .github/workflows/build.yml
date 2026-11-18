@@ -1,0 +1,82 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos-app:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Web — установка, типы, тесты, сборка
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p logs
+          cd web
+          npm install --no-audit --no-fund 2>&1 | tee ../logs/web-install.log
+          npm run check 2>&1 | tee ../logs/web-check.log
+
+      - name: Swift — тесты логики
+        shell: bash
+        run: |
+          set -o pipefail
+          cd macos
+          swift test 2>&1 | tee ../logs/swift-test.log
+
+      - name: Сборка Piranhas.app
+        shell: bash
+        run: |
+          set -o pipefail
+          ./macos/scripts/build-app.sh 2>&1 | tee logs/build-app.log
+
+      - name: Ошибки компилятора — в аннотации
+        if: failure()
+        shell: bash
+        run: |
+          grep -h -E "error:|FAIL|failed" logs/*.log | head -40 | while IFS= read -r line; do echo "::error::${line}"; done || true
+
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: Piranhas-macos
+          path: dist/Piranhas-macos.tar.gz
+          retention-days: 30
+
+      # Готовая сборка и логи — в отдельную ветку builds (перезаписывается каждый раз).
+      # Так приложение можно скачать обычным git, в том числе из приватного репозитория.
+      - name: Публикация в ветку builds
+        if: always() && github.event_name != 'pull_request'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          OUT="$(mktemp -d)"
+          cp -R logs "$OUT/logs" 2>/dev/null || mkdir -p "$OUT/logs"
+          [[ -f dist/Piranhas-macos.tar.gz ]] && cp dist/Piranhas-macos.tar.gz "$OUT/"
+          printf '{"sha":"%s","status":"%s","run":"%s","version":"%s"}\n' \
+            "$GITHUB_SHA" "$JOB_STATUS" "$GITHUB_RUN_NUMBER" "$(cat VERSION)" > "$OUT/status.json"
+          cd "$OUT"
+          git init -q -b builds
+          git add -A
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" \
+            commit -q -m "build ${GITHUB_RUN_NUMBER} (${JOB_STATUS}) for ${GITHUB_SHA::7}"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" builds

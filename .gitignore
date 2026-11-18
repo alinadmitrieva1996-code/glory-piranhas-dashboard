@@ -1,0 +1,9 @@
+node_modules
+web/dist/
+dist/
+macos/.build/
+macos/.swiftpm/
+*.xcodeproj/xcuserdata/
+.DS_Store
+logs/
+.env

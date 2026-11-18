@@ -1,0 +1,21 @@
+{
+  "name": "piranhas-dashboard-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Интерфейс дашборда «Пираньи»: расчёты CPD по гео и байерам, график, таблицы.",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test test/*.test.ts",
+    "build": "node scripts/build.mjs",
+    "check": "npm run typecheck && npm run test && npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.3",
+    "esbuild": "0.28.2",
+    "typescript": "6.0.3"
+  },
+  "engines": {
+    "node": ">=22.18"
+  }
+}
