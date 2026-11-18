@@ -7,7 +7,7 @@ struct PiranhasDashboardApp: App {
     @StateObject private var model = AppModel()
 
     var body: some Scene {
-        WindowGroup("Пираньи") {
+        WindowGroup("Дашборд байеры") {
             ContentView()
                 .environmentObject(model)
         }

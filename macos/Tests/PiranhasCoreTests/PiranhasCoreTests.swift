@@ -69,3 +69,27 @@ final class SnapshotStoreTests: XCTestCase {
         XCTAssertTrue(RefreshPolicy.isStale(savedAt: now.addingTimeInterval(-60 * 60), now: now))
     }
 }
+
+final class AlarmPreferencesTests: XCTestCase {
+    func testSanitizeKeepsOnlyBooleansWithValidIDs() {
+        let raw: [String: Any] = [
+            "lead_not_stopped": false,
+            "geo_cpd_jump": true,
+            "bad id": true,
+            "number_value": 1,
+            "string_value": "yes",
+        ]
+        XCTAssertEqual(AlarmPreferences.sanitize(raw), ["lead_not_stopped": false, "geo_cpd_jump": true])
+        XCTAssertEqual(AlarmPreferences.sanitize(nil), [:])
+        XCTAssertEqual(AlarmPreferences.sanitize("garbage"), [:])
+    }
+
+    func testRoundTripThroughDefaults() throws {
+        let suite = "alarms-test-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        XCTAssertEqual(AlarmPreferences.load(from: defaults), [:])
+        AlarmPreferences.save(["data_missing": false], to: defaults)
+        XCTAssertEqual(AlarmPreferences.load(from: defaults), ["data_missing": false])
+    }
+}

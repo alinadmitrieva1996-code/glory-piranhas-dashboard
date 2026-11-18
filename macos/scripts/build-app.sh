@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
-# Собирает Piranhas.app из Swift-пакета и web/dist. Запускать на macOS (Xcode или Command Line Tools).
-#   ./macos/scripts/build-app.sh            → dist/Piranhas.app и dist/Piranhas-macos.tar.gz
+# Собирает «Дашборд байеры.app» из Swift-пакета и web/dist. Запускать на macOS (Xcode или Command Line Tools).
+#   ./macos/scripts/build-app.sh   → dist/Дашборд байеры.app и dist/Dashboard-Buyers-macos.tar.gz
 # Требует готовый web/dist (cd web && npm run build).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 VERSION="$(cat "$ROOT/VERSION")"
 BUILD="${BUILD_NUMBER:-${GITHUB_RUN_NUMBER:-0}}"
-APP="$ROOT/dist/Piranhas.app"
+APP_NAME="Дашборд байеры.app"
+APP="$ROOT/dist/$APP_NAME"
+ARCHIVE="$ROOT/dist/Dashboard-Buyers-macos.tar.gz"
 
 [[ -f "$ROOT/web/dist/index.html" ]] || { echo "Нет web/dist — сначала: cd web && npm run build" >&2; exit 1; }
 
@@ -37,5 +39,5 @@ plutil -lint "$APP/Contents/Info.plist"
 codesign --force --sign - --timestamp=none "$APP"
 codesign --verify --verbose "$APP"
 
-tar -C "$ROOT/dist" -czf "$ROOT/dist/Piranhas-macos.tar.gz" Piranhas.app
+tar -C "$ROOT/dist" -czf "$ARCHIVE" "$APP_NAME"
 echo "Готово: $APP (версия $VERSION, сборка $BUILD)"

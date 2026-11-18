@@ -10,6 +10,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var isLoading = false
     @Published private(set) var lastError: String?
     @Published private(set) var settings: SourceSettings
+    @Published private(set) var alarmsEnabled: [String: Bool]
     @Published var showSettings = false
 
     private static let endpointDefaultsKey = "sheetEndpoint"
@@ -24,6 +25,7 @@ final class AppModel: ObservableObject {
         let endpoint = UserDefaults.standard.string(forKey: Self.endpointDefaultsKey) ?? ""
         let key = Keychain.read(account: Self.keychainAccount) ?? ""
         settings = SourceSettings(endpoint: endpoint, key: key)
+        alarmsEnabled = AlarmPreferences.load()
 
         if let snapshot = store.load() {
             payloadJSON = snapshot.json
@@ -62,6 +64,14 @@ final class AppModel: ObservableObject {
         settings = cleaned
         showSettings = false
         Task { @MainActor in await self.refresh() }
+    }
+
+    /// Переключатели алармов из интерфейса.
+    func setAlarms(_ raw: Any?) {
+        let clean = AlarmPreferences.sanitize(raw)
+        guard clean != alarmsEnabled else { return }
+        AlarmPreferences.save(clean)
+        alarmsEnabled = clean
     }
 
     func refresh() async {

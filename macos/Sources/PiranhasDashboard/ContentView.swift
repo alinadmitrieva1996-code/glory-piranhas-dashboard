@@ -10,14 +10,15 @@ struct ContentView: View {
                 savedAt: model.savedAt,
                 loading: model.isLoading,
                 error: model.lastError,
-                configured: model.settings.isComplete
+                configured: model.settings.isComplete,
+                alarms: model.alarmsEnabled
             ),
             onAction: { action in
                 Task { @MainActor in
                     switch action {
-                    case "refresh": await model.refresh()
-                    case "settings": model.showSettings = true
-                    default: break
+                    case .refresh: await model.refresh()
+                    case .settings: model.showSettings = true
+                    case let .setAlarms(raw): model.setAlarms(raw)
                     }
                 }
             }

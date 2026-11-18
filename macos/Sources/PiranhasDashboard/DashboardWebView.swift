@@ -9,6 +9,30 @@ struct WebState: Equatable {
     var loading: Bool
     var error: String?
     var configured: Bool
+    var alarms: [String: Bool]
+}
+
+/// Сообщения из интерфейса (window.webkit.messageHandlers.app.postMessage).
+enum WebAction {
+    case refresh
+    case settings
+    case setAlarms(Any?)
+
+    init?(body: Any) {
+        if let text = body as? String {
+            switch text {
+            case "refresh": self = .refresh
+            case "settings": self = .settings
+            default: return nil
+            }
+            return
+        }
+        if let dict = body as? [String: Any], (dict["type"] as? String) == "setAlarms" {
+            self = .setAlarms(dict["alarms"])
+            return
+        }
+        return nil
+    }
 }
 
 enum WebAssets {
@@ -26,7 +50,7 @@ enum WebAssets {
 /// страница в сеть не ходит (CSP: default-src 'none').
 struct DashboardWebView: NSViewRepresentable {
     let state: WebState
-    let onAction: (String) -> Void
+    let onAction: (WebAction) -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator(onAction: onAction)
@@ -57,12 +81,12 @@ struct DashboardWebView: NSViewRepresentable {
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         weak var webView: WKWebView?
-        var onAction: (String) -> Void
+        var onAction: (WebAction) -> Void
         private var pageReady = false
         private var pending: WebState?
         private var lastSent: WebState?
 
-        init(onAction: @escaping (String) -> Void) {
+        init(onAction: @escaping (WebAction) -> Void) {
             self.onAction = onAction
         }
 
@@ -86,6 +110,7 @@ struct DashboardWebView: NSViewRepresentable {
             ]
             meta["savedAt"] = state.savedAt.map { ISO8601DateFormatter().string(from: $0) } ?? NSNull()
             meta["error"] = state.error ?? NSNull()
+            meta["alarms"] = state.alarms
             let metaJSON = (try? JSONSerialization.data(withJSONObject: meta))
                 .flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
             // payloadJSON уже проверен PayloadValidator: это валидный JSON-объект.
@@ -101,7 +126,7 @@ struct DashboardWebView: NSViewRepresentable {
         }
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-            guard let action = message.body as? String else { return }
+            guard let action = WebAction(body: message.body) else { return }
             onAction(action)
         }
     }
