@@ -1,5 +1,6 @@
-import { dayShort, int, money0, money2, moneyShort } from '../domain/format.ts';
-import type { DailyPoint } from '../domain/types.ts';
+import { dayLong, int, money0, money2, moneyShort, pct } from '../domain/format.ts';
+import { cpdStatus } from '../domain/status.ts';
+import type { BuyerDay, DailyPoint } from '../domain/types.ts';
 import { h, s } from './dom.ts';
 
 /** Округляет максимум шкалы до «красивого» числа (1, 2, 2.5, 5 × 10^n). */
@@ -13,105 +14,126 @@ export function niceMax(v: number): number {
 const isOver = (d: DailyPoint, bench: number | null): boolean =>
   d.cpdCents === null || (bench !== null && d.cpdCents > bench);
 
+export interface ChartOptions {
+  points: readonly DailyPoint[];
+  benchCents: number | null;
+  /** Отчётный день — подсвечивается и выбран по умолчанию. */
+  reportDay: string | null;
+  buyersByDate: Readonly<Record<string, BuyerDay[]>>;
+  label: string;
+}
+
+const PLOT_H = 250;
+const CPD_TOP = 20;
+const CPD_BOTTOM = 120;
+const SPEND_TOP = 150;
+const SPEND_BOTTOM = 240;
+
 /**
- * Два ряда на одной оси дней: сверху линия CPD с пунктиром бенча,
- * снизу столбики спенда. Красным — дни выше бенча или без FTD.
+ * Два ряда на одной оси дней: сверху точки и линия CPD с пунктиром бенча,
+ * снизу столбики спенда. Наведение на день показывает его цифры в строке под графиком,
+ * клик закрепляет день.
  */
-export function renderChart(host: HTMLElement, points: readonly DailyPoint[], benchCents: number | null, label: string): void {
+export function renderChart(host: HTMLElement, o: ChartOptions): void {
   host.replaceChildren();
+  const { points, benchCents: bench } = o;
   if (!points.length) {
     host.append(h('p', { class: 'muted' }, 'В этом месяце спенда нет'));
     return;
   }
-  const W = Math.max(300, Math.floor(host.clientWidth || 640));
-  const H = 290;
-  const m = { l: 52, r: 10 };
-  const top = { y0: 30, h: 104 };
-  const bot = { y0: 176, h: 84 };
-  const axisY = 278;
-
   const n = points.length;
-  const step = (W - m.l - m.r) / n;
-  const bw = Math.max(2, step * 0.72);
-  const cx = (i: number): number => m.l + step * i + step / 2;
-
+  const step = 100 / n;
   const cpdVals = points.map((p) => p.cpdCents).filter((v): v is number => v !== null);
-  const cpdMax = niceMax(Math.max(benchCents ?? 0, ...cpdVals, 100) * 1.1);
-  const spendMax = niceMax(Math.max(...points.map((p) => p.spendCents)) * 1.05);
-  const yC = (v: number): number => top.y0 + top.h - (v / cpdMax) * top.h;
-  const yS = (v: number): number => bot.y0 + bot.h - (v / spendMax) * bot.h;
+  const cMax = niceMax(Math.max(bench ?? 0, ...cpdVals, 100) * 1.1);
+  const sMax = niceMax(Math.max(...points.map((p) => p.spendCents)) * 1.05);
+  const yC = (v: number): number => CPD_BOTTOM - (v / cMax) * (CPD_BOTTOM - CPD_TOP);
+  const yS = (v: number): number => SPEND_BOTTOM - (v / sMax) * (SPEND_BOTTOM - SPEND_TOP);
 
-  const svg = s('svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', role: 'img', 'aria-label': label });
+  const axis = h(
+    'div',
+    { class: 'ch-axis', 'aria-hidden': 'true' },
+    h('span', { style: 'top:0' }, 'CPD'),
+    h('span', { style: `top:${yC(cMax) - 6}px` }, money0(cMax)),
+    h('span', { style: `top:${yC(cMax / 2) - 6}px` }, money0(cMax / 2)),
+    h('span', { style: `top:${CPD_BOTTOM - 6}px` }, '$0'),
+    h('span', { style: `top:${SPEND_TOP - 24}px` }, 'Спенд'),
+    h('span', { style: `top:${yS(sMax) - 6}px` }, moneyShort(sMax)),
+    h('span', { style: `top:${SPEND_BOTTOM - 6}px` }, '$0'),
+  );
 
-  const caption = (y: number, text: string, x = 0, anchor = 'start'): SVGTextElement =>
-    s('text', { x, y, class: 'ch-cap', 'text-anchor': anchor }, text);
-  svg.append(caption(top.y0 - 16, 'CPD, $'), caption(bot.y0 - 16, 'Спенд за день, $'));
-
-  const grid = (y0: number, hgt: number, max: number, fmt: (v: number) => string): void => {
-    for (const k of [0, 0.5, 1]) {
-      const y = y0 + hgt - k * hgt;
-      svg.append(s('line', { x1: m.l, x2: W - m.r, y1: y, y2: y, class: 'ch-grid' }));
-      svg.append(s('text', { x: m.l - 6, y: y + 4, class: 'ch-tick', 'text-anchor': 'end' }, fmt(max * k)));
-    }
-  };
-  grid(top.y0, top.h, cpdMax, (v) => '$' + Math.round(v / 100));
-  grid(bot.y0, bot.h, spendMax, moneyShort);
-
-  const every = Math.max(1, Math.ceil(n / Math.max(2, Math.floor((W - m.l) / 40))));
-  points.forEach((p, i) => {
-    if (i % every === 0) svg.append(s('text', { x: cx(i), y: axisY, class: 'ch-tick', 'text-anchor': 'middle' }, String(Number(p.date.slice(8)))));
-    const y = yS(p.spendCents);
-    svg.append(
-      s('rect', {
-        x: cx(i) - bw / 2,
-        y,
-        width: bw,
-        height: Math.max(1, bot.y0 + bot.h - y),
-        rx: 1.5,
-        class: isOver(p, benchCents) ? 'ch-bar ch-bad' : 'ch-bar',
-      }),
-    );
-  });
-
-  if (benchCents !== null) {
-    const y = yC(benchCents);
-    svg.append(s('line', { x1: m.l, x2: W - m.r, y1: y, y2: y, class: 'ch-bench' }));
-    svg.append(caption(top.y0 - 16, `- - бенч ${money0(benchCents)}`, W - m.r, 'end'));
+  const plot = h('div', { class: 'ch-plot', role: 'img', 'aria-label': o.label });
+  for (const y of [yC(cMax), yC(cMax / 2), CPD_BOTTOM, yS(sMax), SPEND_BOTTOM]) {
+    plot.append(h('div', { class: 'ch-grid', style: `top:${y}px` }));
   }
+  const reportIdx = points.findIndex((p) => p.date === o.reportDay);
+  if (reportIdx >= 0) plot.append(h('div', { class: 'ch-today', style: `left:${reportIdx * step}%;width:${step}%` }));
+  if (bench !== null) plot.append(h('div', { class: 'ch-bench', style: `top:${yC(bench)}px` }));
 
   const withCpd = points.map((p, i) => ({ p, i })).filter((x) => x.p.cpdCents !== null);
   if (withCpd.length > 1) {
-    const d = withCpd.map((x, k) => `${k ? 'L' : 'M'}${cx(x.i).toFixed(1)},${yC(x.p.cpdCents ?? 0).toFixed(1)}`).join('');
-    svg.append(s('path', { d, class: 'ch-line' }));
-  }
-  for (const x of withCpd) {
-    svg.append(s('circle', { cx: cx(x.i), cy: yC(x.p.cpdCents ?? 0), r: 3.5, class: isOver(x.p, benchCents) ? 'ch-dot ch-bad' : 'ch-dot' }));
+    const d = withCpd.map((x, k) => `${k ? 'L' : 'M'}${(((x.i + 0.5) / n) * 1000).toFixed(1)},${yC(x.p.cpdCents ?? 0).toFixed(1)}`).join(' ');
+    plot.append(
+      s('svg', { class: 'ch-line', viewBox: `0 0 1000 ${PLOT_H}`, preserveAspectRatio: 'none', 'aria-hidden': 'true' }, s('path', { d, 'vector-effect': 'non-scaling-stroke' })),
+    );
   }
 
-  const hl = s('rect', { x: 0, y: top.y0, width: step, height: bot.y0 + bot.h - top.y0, class: 'ch-hl', visibility: 'hidden' });
-  svg.append(hl);
-  const tip = h('div', { class: 'ch-tip', hidden: true });
+  const sel = h('div', { class: 'ch-sel', hidden: true });
+  plot.append(sel);
+  const detail = h('div', { class: 'ch-detail', 'aria-live': 'polite' });
+  let pinned = reportIdx >= 0 ? reportIdx : n - 1;
+
+  const show = (i: number): void => {
+    const p = points[i];
+    if (!p) return;
+    sel.hidden = false;
+    sel.style.left = `${i * step}%`;
+    sel.style.width = `${step}%`;
+    const st = cpdStatus(p, bench).level;
+    const buyers = o.buyersByDate[p.date] ?? [];
+    detail.replaceChildren(
+      h('b', { class: 'ch-detail-date' }, dayLong(p.date) + (i === pinned && i !== reportIdx ? ' · закреплён' : '')),
+      h('span', {}, 'Спенд ', h('b', {}, money2(p.spendCents))),
+      h('span', {}, 'CPD ', h('b', { class: `st-${st}` }, p.cpdCents === null ? 'нет FTD' : money2(p.cpdCents))),
+      h('span', {}, 'FTD ', h('b', {}, int(p.ftd))),
+      h('span', {}, 'Reg→FTD ', h('b', {}, p.regs ? pct((p.ftd * 100) / p.regs) : '—')),
+      h(
+        'span',
+        { class: 'ch-detail-buyers' },
+        buyers.map((b) => `${b.buyer.replace('BUYER', 'B')} ${money0(b.spendCents)} · ${b.cpdCents === null ? 'нет FTD' : money2(b.cpdCents)}`).join('   '),
+      ),
+    );
+  };
 
   points.forEach((p, i) => {
-    const hit = s('rect', { x: m.l + step * i, y: top.y0, width: step, height: axisY - top.y0, fill: 'transparent' });
-    hit.addEventListener('pointerenter', () => {
-      hl.setAttribute('x', String(m.l + step * i));
-      hl.setAttribute('visibility', 'visible');
-      tip.replaceChildren(
-        h('div', {}, `${dayShort(p.date)}: CPD ${p.cpdCents === null ? 'нет FTD' : money2(p.cpdCents)}`),
-        h('span', {}, `Спенд ${money0(p.spendCents)} · FTD ${int(p.ftd)}`),
-      );
-      tip.hidden = false;
-      const scale = (host.clientWidth || W) / W;
-      const left = cx(i) * scale - tip.offsetWidth / 2;
-      tip.style.left = `${Math.min(Math.max(0, left), (host.clientWidth || W) - tip.offsetWidth)}px`;
+    const color = isOver(p, bench) ? 'bad' : 'ok';
+    const top = yS(p.spendCents);
+    plot.append(
+      h('div', {
+        class: `ch-bar ch-${color}`,
+        style: `left:${i * step + step * 0.2}%;width:${step * 0.6}%;top:${top}px;height:${Math.max(1, SPEND_BOTTOM - top)}px`,
+      }),
+    );
+    if (p.cpdCents !== null) {
+      plot.append(h('div', { class: `ch-dot ch-${color}`, style: `left:${(i + 0.5) * step}%;top:${yC(p.cpdCents)}px` }));
+    }
+    const hit = h('button', {
+      type: 'button',
+      class: 'ch-hit',
+      style: `left:${i * step}%;width:${step}%`,
+      'aria-label': `${dayLong(p.date)}: спенд ${money0(p.spendCents)}, CPD ${p.cpdCents === null ? 'нет FTD' : money2(p.cpdCents)}, FTD ${p.ftd}`,
     });
-    hit.addEventListener('pointerleave', () => {
-      tip.hidden = true;
-      hl.setAttribute('visibility', 'hidden');
+    hit.addEventListener('mouseenter', () => show(i));
+    hit.addEventListener('focus', () => show(i));
+    hit.addEventListener('click', () => {
+      pinned = i;
+      show(i);
     });
-    svg.append(hit);
+    plot.append(hit);
   });
+  plot.addEventListener('mouseleave', () => show(pinned));
 
-  host.append(svg, tip);
+  const labels = h('div', { class: 'ch-days', 'aria-hidden': 'true' }, ...points.map((p, i) => h('span', { class: i === reportIdx ? 'today' : undefined }, String(Number(p.date.slice(8))))));
+
+  host.append(h('div', { class: 'ch-wrap' }, axis, plot), labels, detail);
+  show(pinned);
 }

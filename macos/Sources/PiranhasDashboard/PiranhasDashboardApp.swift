@@ -11,7 +11,7 @@ struct PiranhasDashboardApp: App {
             ContentView()
                 .environmentObject(model)
         }
-        .defaultSize(width: 1080, height: 860)
+        .defaultSize(width: 1440, height: 940)
         .commands {
             CommandGroup(replacing: .newItem) {}
             CommandGroup(after: .toolbar) {

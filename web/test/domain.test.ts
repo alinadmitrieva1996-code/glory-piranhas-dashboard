@@ -2,13 +2,13 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { GEOS } from '../src/config.ts';
 import { dayShort, money0, money2, monthName } from '../src/domain/format.ts';
-import { buildModel, lastFilledDay, normalize, sumLines } from '../src/domain/metrics.ts';
+import { applyBenches, buildModel, lastFilledDay, normalize, overpayCents, reportDay, sumLines } from '../src/domain/metrics.ts';
 import { cpdCents, toCents } from '../src/domain/money.ts';
 import { parsePayload } from '../src/domain/parse.ts';
 import { cpdStatus, worst, yesterdayMsk } from '../src/domain/status.ts';
 import type { SheetRow } from '../src/domain/types.ts';
 
-const row = (buyer: string, date: string, geo: string, spend: number, ftd: number): SheetRow => ({ buyer, date, geo, clicks: 0, regs: 0, ftd, spend });
+const row = (buyer: string, date: string, geo: string, spend: number, ftd: number, regs = 0): SheetRow => ({ buyer, date, geo, clicks: 0, regs, ftd, spend });
 
 const ROWS: SheetRow[] = [
   row('BUYER1', '2026-10-31', 'AR', 500, 10), // прошлый месяц — не входит в ноябрь
@@ -65,25 +65,32 @@ describe('buildModel', () => {
 
   it('считает «вчера» и месяц по гео, без прошлого месяца', () => {
     assert.ok(ar);
-    assert.deepEqual(ar.day, { spendCents: 63000, ftd: 10, cpdCents: 6300 });
-    assert.deepEqual(ar.month, { spendCents: 93030, ftd: 20, cpdCents: 4652 });
+    assert.deepEqual(ar.day, { spendCents: 63000, ftd: 10, regs: 0, cpdCents: 6300 });
+    assert.deepEqual(ar.month, { spendCents: 93030, ftd: 20, regs: 0, cpdCents: 4652 });
   });
 
   it('не смешивает гео', () => {
     assert.ok(et);
-    assert.deepEqual(et.month, { spendCents: 3600, ftd: 2, cpdCents: 1800 });
+    assert.deepEqual(et.month, { spendCents: 3600, ftd: 2, regs: 0, cpdCents: 1800 });
   });
 
-  it('байеры отсортированы по спенду, спенд без FTD даёт null CPD', () => {
+  it('байеры: сортировка по переплате, вчера и месяц, доля спенда', () => {
     assert.ok(ar);
+    // бенч AR $20: BUYER2 $530,20 на 5 FTD → переплата $430,20; BUYER1 $400,10 на 15 FTD → $100,10
     assert.deepEqual(
-      ar.buyersDay.map((b) => [b.buyer, b.spendCents, b.cpdCents]),
+      ar.buyers.map((b) => [b.buyer, b.overpayCents, b.day.cpdCents, b.shareBp]),
       [
-        ['BUYER2', 33000, null],
-        ['BUYER1', 30000, 3000],
+        ['BUYER2', 43020, null, 5699],
+        ['BUYER1', 10010, 3000, 4301],
       ],
     );
-    assert.deepEqual(sumLines(ar.buyersDay), ar.day);
+    assert.deepEqual(sumLines(ar.buyers.map((b) => b.day)), ar.day);
+    assert.equal(ar.buyers[0]?.last7.length, 7);
+  });
+
+  it('запас до бенча: бенч × FTD − спенд', () => {
+    assert.equal(ar?.headroomCents, 2000 * 20 - 93030);
+    assert.equal(model.geos.find((g) => g.geo.code === 'MY')?.headroomCents, null);
   });
 
   it('график — только дни со спендом, по порядку', () => {
@@ -98,8 +105,39 @@ describe('buildModel', () => {
   });
 });
 
+describe('отчётный день и бенчи', () => {
+  it('последний день, внесённый половиной байеров и меньше, считается частичным', () => {
+    const rs = normalize([
+      row('B1', '2026-11-16', 'AR', 100, 5), row('B2', '2026-11-16', 'AR', 100, 5), row('B3', '2026-11-16', 'ET', 50, 2), row('B4', '2026-11-16', 'AR', 10, 1),
+      row('B4', '2026-11-17', 'AR', 100, 5),
+    ]);
+    assert.deepEqual(reportDay(rs), { day: '2026-11-16', partial: { date: '2026-11-17', entered: 1, expected: 4 } });
+  });
+
+  it('если внесли больше половины — день полный', () => {
+    const rs = normalize([
+      row('B1', '2026-11-16', 'AR', 100, 5), row('B2', '2026-11-16', 'AR', 100, 5), row('B3', '2026-11-16', 'AR', 100, 5),
+      row('B1', '2026-11-17', 'AR', 100, 5), row('B2', '2026-11-17', 'AR', 100, 5),
+    ]);
+    assert.deepEqual(reportDay(rs), { day: '2026-11-17', partial: null });
+  });
+
+  it('модель берёт отчётный день, а не частичный', () => {
+    const m = buildModel([...ROWS, row('BUYER9', '2026-11-03', 'AR', 50, 1)], GEOS);
+    assert.equal(m.lastDay, '2026-11-02');
+    assert.equal(m.partial?.date, '2026-11-03');
+  });
+
+  it('переплата и бенч пользователя', () => {
+    assert.equal(overpayCents({ spendCents: 10000, ftd: 4, regs: 0, cpdCents: 2500 }, 2000), 2000);
+    assert.equal(overpayCents({ spendCents: 10000, ftd: 4, regs: 0, cpdCents: 2500 }, null), 0);
+    const g = applyBenches(GEOS, { AR: 2200, MY: 4000, XX: 1, ET: -5 });
+    assert.deepEqual(g.map((x) => x.benchCents), [2200, 1800, 4000]);
+  });
+});
+
 describe('cpdStatus', () => {
-  const t = (spendCents: number, ftd: number) => ({ spendCents, ftd, cpdCents: cpdCents(spendCents, ftd) });
+  const t = (spendCents: number, ftd: number) => ({ spendCents, ftd, regs: 0, cpdCents: cpdCents(spendCents, ftd) });
   it('выше бенча — красный с процентом', () => {
     assert.deepEqual(cpdStatus(t(2600, 1), 2000), { level: 'bad', text: 'Выше бенча на 30%' });
   });

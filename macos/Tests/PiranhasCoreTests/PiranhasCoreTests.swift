@@ -93,3 +93,29 @@ final class AlarmPreferencesTests: XCTestCase {
         XCTAssertEqual(AlarmPreferences.load(from: defaults), ["data_missing": false])
     }
 }
+
+final class BenchPreferencesTests: XCTestCase {
+    func testSanitizeKeepsWholeCentsForValidGeo() {
+        let raw: [String: Any] = [
+            "AR": 2200,
+            "MY": 4000,
+            "ET": 18.5,       // не целые центы
+            "ar": 2000,       // код в нижнем регистре
+            "XX": 0,          // ноль
+            "BD": 99_000_000, // слишком много
+            "NP": true,       // не число
+            "PK": "2000",     // строка
+        ]
+        XCTAssertEqual(BenchPreferences.sanitize(raw), ["AR": 2200, "MY": 4000])
+        XCTAssertEqual(BenchPreferences.sanitize(nil), [:])
+    }
+
+    func testRoundTripThroughDefaults() throws {
+        let suite = "bench-test-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        XCTAssertEqual(BenchPreferences.load(from: defaults), [:])
+        BenchPreferences.save(["AR": 2150], to: defaults)
+        XCTAssertEqual(BenchPreferences.load(from: defaults), ["AR": 2150])
+    }
+}

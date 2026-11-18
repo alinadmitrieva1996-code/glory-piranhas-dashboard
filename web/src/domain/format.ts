@@ -55,3 +55,27 @@ export function timeLabel(iso: string, now: Date): string {
   if (sameDay) return hm;
   return `${t.getDate()} ${MONTHS_SHORT[t.getMonth()] ?? ''}, ${hm}`;
 }
+
+/** «2026-11-16» → «16 ноября 2026». */
+export function dayLong(iso: string | null): string {
+  if (!iso) return '—';
+  const m = Number(iso.slice(5, 7));
+  return `${Number(iso.slice(8, 10))} ${MONTHS_GEN[m - 1] ?? ''} ${iso.slice(0, 4)}`;
+}
+
+/** «2026-11-16» → «16 ноября». */
+export function dayMedium(iso: string | null): string {
+  if (!iso) return '—';
+  return `${Number(iso.slice(8, 10))} ${MONTHS_GEN[Number(iso.slice(5, 7)) - 1] ?? ''}`;
+}
+
+/** 25.4 → «25%». */
+export function pct(x: number): string {
+  return nf0.format(Math.round(x)) + '%';
+}
+
+/** «2026-11-01», «2026-11-16» → «01.11–16.11». */
+export function rangeShort(from: string, to: string): string {
+  const f = (iso: string): string => `${iso.slice(8, 10)}.${iso.slice(5, 7)}`;
+  return `${f(from)}–${f(to)}`;
+}

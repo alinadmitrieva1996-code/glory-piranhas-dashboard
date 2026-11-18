@@ -1,6 +1,6 @@
 import { ALARM_THRESHOLDS as T } from '../config.ts';
 import { dayShort, money0, money2 } from './format.ts';
-import { lastFilledDay, normalize } from './metrics.ts';
+import { addDays, lastFilledDay, normalize, reportDay } from './metrics.ts';
 import { cpdCents } from './money.ts';
 import { yesterdayMsk } from './status.ts';
 import type { DayRow, GeoConfig, SheetRow, Totals } from './types.ts';
@@ -87,18 +87,13 @@ export const ALARM_DEFS: readonly AlarmDef[] = [
     id: 'data_missing',
     severity: 'data',
     title: 'Вчера не внесено',
-    condition: `После ${T.dataDeadlineHourMsk}:00 по Москве в таблице нет вчерашнего дня.`,
+    condition: `После ${T.dataDeadlineHourMsk}:00 по Москве вчерашнего дня нет в таблице или его внесла половина байеров и меньше.`,
   },
 ];
 
 export const DEFAULT_ENABLED: Readonly<Record<string, boolean>> = Object.fromEntries(ALARM_DEFS.map((d) => [d.id, true]));
 
-/** Дата ± n дней, YYYY-MM-DD (в UTC, без часовых поясов). */
-export function addDays(iso: string, n: number): string {
-  const d = new Date(`${iso}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + n);
-  return d.toISOString().slice(0, 10);
-}
+export { addDays };
 
 class Ledger {
   private readonly geoDay = new Map<string, { s: number; f: number }>();
@@ -135,7 +130,7 @@ function add(map: Map<string, { s: number; f: number }>, key: string, r: DayRow)
 function totals(a: { s: number; f: number } | undefined): Totals {
   const s = a?.s ?? 0;
   const f = a?.f ?? 0;
-  return { spendCents: s, ftd: f, cpdCents: cpdCents(s, f) };
+  return { spendCents: s, ftd: f, regs: 0, cpdCents: cpdCents(s, f) };
 }
 
 const isOver = (t: Totals, bench: number | null): boolean =>
@@ -159,18 +154,21 @@ function mskHour(now: Date): number {
  */
 export function evaluateAlarms(sheetRows: readonly SheetRow[], geos: readonly GeoConfig[], now: Date): { lastDay: string | null; results: AlarmResult[] } {
   const rows = normalize(sheetRows);
-  const lastDay = lastFilledDay(rows);
+  const { day: lastDay, partial } = reportDay(rows);
+  const lastAny = lastFilledDay(rows);
   const hits = new Map<string, AlarmHit[]>(ALARM_DEFS.map((d) => [d.id, []]));
   const push = (id: string, hit: AlarmHit): void => {
     hits.get(id)?.push(hit);
   };
 
   const yesterday = yesterdayMsk(now);
-  if (mskHour(now) >= T.dataDeadlineHourMsk && (lastDay === null || lastDay < yesterday)) {
+  if (mskHour(now) >= T.dataDeadlineHourMsk && (lastAny === null || lastAny < yesterday)) {
     push('data_missing', {
       geo: null,
-      text: lastDay === null ? `Нет данных за ${dayShort(yesterday)}: таблица пустая.` : `Нет данных за ${dayShort(yesterday)}. Последний внесённый день — ${dayShort(lastDay)}.`,
+      text: lastAny === null ? `Нет данных за ${dayShort(yesterday)}: таблица пустая.` : `Нет данных за ${dayShort(yesterday)}. Последний внесённый день — ${dayShort(lastAny)}.`,
     });
+  } else if (mskHour(now) >= T.dataDeadlineHourMsk && partial && partial.date === yesterday) {
+    push('data_missing', { geo: null, text: `${dayShort(partial.date)} внесли ${partial.entered} из ${partial.expected} байеров.` });
   }
 
   if (lastDay !== null) {
@@ -190,7 +188,7 @@ export function evaluateAlarms(sheetRows: readonly SheetRow[], geos: readonly Ge
           mf += r.ftd;
         }
       }
-      const monthTotals: Totals = { spendCents: ms, ftd: mf, cpdCents: cpdCents(ms, mf) };
+      const monthTotals: Totals = { spendCents: ms, ftd: mf, regs: 0, cpdCents: cpdCents(ms, mf) };
 
       if (bench !== null && isOver(day, bench)) {
         push('geo_day_over_bench', { geo: g.code, text: `${g.name}, ${dayShort(lastDay)}: ${overText(day, bench)}, спенд ${money0(day.spendCents)}.` });

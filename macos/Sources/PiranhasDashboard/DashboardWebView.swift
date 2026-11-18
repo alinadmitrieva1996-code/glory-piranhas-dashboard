@@ -10,6 +10,7 @@ struct WebState: Equatable {
     var error: String?
     var configured: Bool
     var alarms: [String: Bool]
+    var benches: [String: Int]
 }
 
 /// Сообщения из интерфейса (window.webkit.messageHandlers.app.postMessage).
@@ -17,6 +18,7 @@ enum WebAction {
     case refresh
     case settings
     case setAlarms(Any?)
+    case setBenches(Any?)
 
     init?(body: Any) {
         if let text = body as? String {
@@ -27,9 +29,17 @@ enum WebAction {
             }
             return
         }
-        if let dict = body as? [String: Any], (dict["type"] as? String) == "setAlarms" {
-            self = .setAlarms(dict["alarms"])
-            return
+        if let dict = body as? [String: Any] {
+            switch dict["type"] as? String {
+            case "setAlarms":
+                self = .setAlarms(dict["alarms"])
+                return
+            case "setBenches":
+                self = .setBenches(dict["benches"])
+                return
+            default:
+                return nil
+            }
         }
         return nil
     }
@@ -61,6 +71,11 @@ struct DashboardWebView: NSViewRepresentable {
         configuration.userContentController.add(context.coordinator, name: "app")
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
+        // Тёмный фон до загрузки страницы — без белой вспышки.
+        webView.setValue(false, forKey: "drawsBackground")
+        if #available(macOS 12.0, *) {
+            webView.underPageBackgroundColor = NSColor(red: 0x0F / 255, green: 0x11 / 255, blue: 0x13 / 255, alpha: 1)
+        }
         context.coordinator.webView = webView
         if let index = WebAssets.indexURL() {
             webView.loadFileURL(index, allowingReadAccessTo: index.deletingLastPathComponent())
@@ -111,6 +126,7 @@ struct DashboardWebView: NSViewRepresentable {
             meta["savedAt"] = state.savedAt.map { ISO8601DateFormatter().string(from: $0) } ?? NSNull()
             meta["error"] = state.error ?? NSNull()
             meta["alarms"] = state.alarms
+            meta["benches"] = state.benches
             let metaJSON = (try? JSONSerialization.data(withJSONObject: meta))
                 .flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
             // payloadJSON уже проверен PayloadValidator: это валидный JSON-объект.

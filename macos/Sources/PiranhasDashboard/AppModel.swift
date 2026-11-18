@@ -11,6 +11,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var lastError: String?
     @Published private(set) var settings: SourceSettings
     @Published private(set) var alarmsEnabled: [String: Bool]
+    @Published private(set) var benchOverrides: [String: Int]
     @Published var showSettings = false
 
     private static let endpointDefaultsKey = "sheetEndpoint"
@@ -26,6 +27,7 @@ final class AppModel: ObservableObject {
         let key = Keychain.read(account: Self.keychainAccount) ?? ""
         settings = SourceSettings(endpoint: endpoint, key: key)
         alarmsEnabled = AlarmPreferences.load()
+        benchOverrides = BenchPreferences.load()
 
         if let snapshot = store.load() {
             payloadJSON = snapshot.json
@@ -72,6 +74,14 @@ final class AppModel: ObservableObject {
         guard clean != alarmsEnabled else { return }
         AlarmPreferences.save(clean)
         alarmsEnabled = clean
+    }
+
+    /// Бенчи, изменённые на экране гео (центы).
+    func setBenches(_ raw: Any?) {
+        let clean = BenchPreferences.sanitize(raw)
+        guard clean != benchOverrides else { return }
+        BenchPreferences.save(clean)
+        benchOverrides = clean
     }
 
     func refresh() async {

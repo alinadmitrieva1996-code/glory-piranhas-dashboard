@@ -26,6 +26,7 @@ export interface DayRow {
   date: string;
   geo: string;
   ftd: number;
+  regs: number;
   spendCents: number;
 }
 
@@ -39,6 +40,7 @@ export interface Status {
 export interface Totals {
   spendCents: number;
   ftd: number;
+  regs: number;
   /** null — FTD нет, CPD не определён. */
   cpdCents: number | null;
 }
@@ -47,8 +49,20 @@ export interface DailyPoint extends Totals {
   date: string;
 }
 
-export interface BuyerLine extends Totals {
+export interface BuyerDay extends Totals {
   buyer: string;
+}
+
+export interface BuyerSummary {
+  buyer: string;
+  day: Totals;
+  month: Totals;
+  /** Доля в спенде гео за месяц, в базисных пунктах (100% = 10 000). */
+  shareBp: number;
+  /** Спенд сверх бенча × FTD за месяц, центы (0, если в бенче). */
+  overpayCents: number;
+  /** Последние 7 календарных дней по отчётный день включительно. */
+  last7: DailyPoint[];
 }
 
 export interface GeoConfig {
@@ -62,15 +76,29 @@ export interface GeoSummary {
   geo: GeoConfig;
   day: Totals;
   month: Totals;
+  /** Средние за 7 дней до отчётного дня (только дни со спендом); null — данных мало. */
+  avg7: { spendCents: number; ftd: number; cpdCents: number | null } | null;
+  /** Бенч × FTD − спенд за месяц: >0 — запас, <0 — перерасход. null — бенча нет. */
+  headroomCents: number | null;
   daily: DailyPoint[];
-  buyersDay: BuyerLine[];
-  buyersMonth: BuyerLine[];
+  /** Байеры по дням: дата → строки байеров (для строки выбранного дня на графике). */
+  buyersByDate: Record<string, BuyerDay[]>;
+  buyers: BuyerSummary[];
+}
+
+/** Последний день заполнен не всеми байерами. */
+export interface PartialDay {
+  date: string;
+  entered: number;
+  expected: number;
 }
 
 export interface DashboardModel {
-  /** Последний день, где у команды есть спенд. null — данных нет. */
+  /** Отчётный день («вчера»): последний полностью заполненный. null — данных нет. */
   lastDay: string | null;
-  /** Месяц последнего дня, YYYY-MM. */
+  /** Месяц отчётного дня, YYYY-MM. */
   month: string | null;
+  /** Последний день в таблице заполнен частично — показываем предыдущий. */
+  partial: PartialDay | null;
   geos: GeoSummary[];
 }

@@ -11,7 +11,8 @@ struct ContentView: View {
                 loading: model.isLoading,
                 error: model.lastError,
                 configured: model.settings.isComplete,
-                alarms: model.alarmsEnabled
+                alarms: model.alarmsEnabled,
+                benches: model.benchOverrides
             ),
             onAction: { action in
                 Task { @MainActor in
@@ -19,32 +20,14 @@ struct ContentView: View {
                     case .refresh: await model.refresh()
                     case .settings: model.showSettings = true
                     case let .setAlarms(raw): model.setAlarms(raw)
+                    case let .setBenches(raw): model.setBenches(raw)
                     }
                 }
             }
         )
-        .frame(minWidth: 760, minHeight: 560)
-        .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                if model.isLoading {
-                    ProgressView().controlSize(.small)
-                }
-                Button {
-                    Task { @MainActor in await model.refresh() }
-                } label: {
-                    Label("Обновить", systemImage: "arrow.clockwise")
-                }
-                .help("Подтянуть свежие данные из Google Sheet (⌘R)")
-                .disabled(model.isLoading)
-
-                Button {
-                    model.showSettings = true
-                } label: {
-                    Label("Подключение", systemImage: "gearshape")
-                }
-                .help("Ссылка на скрипт таблицы и ключ (⌘,)")
-            }
-        }
+        .frame(minWidth: 900, minHeight: 600)
+        .background(Color(red: 0x0F / 255, green: 0x11 / 255, blue: 0x13 / 255))
+        .preferredColorScheme(.dark)
         .sheet(isPresented: $model.showSettings) {
             SettingsView(
                 initial: model.settings,

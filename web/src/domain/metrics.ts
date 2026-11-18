@@ -1,8 +1,15 @@
 import { cpdCents, toCents } from './money.ts';
-import type { BuyerLine, DailyPoint, DashboardModel, DayRow, GeoConfig, GeoSummary, SheetRow, Totals } from './types.ts';
+import type { BuyerDay, BuyerSummary, DailyPoint, DashboardModel, DayRow, GeoConfig, GeoSummary, PartialDay, SheetRow, Totals } from './types.ts';
 
 export function normalize(rows: readonly SheetRow[]): DayRow[] {
-  return rows.map((r) => ({ buyer: r.buyer, date: r.date, geo: r.geo, ftd: r.ftd, spendCents: toCents(r.spend) }));
+  return rows.map((r) => ({ buyer: r.buyer, date: r.date, geo: r.geo, ftd: r.ftd, regs: r.regs, spendCents: toCents(r.spend) }));
+}
+
+/** Дата ± n дней, YYYY-MM-DD (в UTC, без часовых поясов). */
+export function addDays(iso: string, n: number): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
 }
 
 /** Последний день, где у команды (по всем гео) есть спенд. */
@@ -12,82 +19,169 @@ export function lastFilledDay(rows: readonly DayRow[]): string | null {
   return last;
 }
 
-function totals(rows: readonly DayRow[]): Totals {
-  let spendCents = 0;
-  let ftd = 0;
-  for (const r of rows) {
-    spendCents += r.spendCents;
-    ftd += r.ftd;
-  }
-  return { spendCents, ftd, cpdCents: cpdCents(spendCents, ftd) };
-}
-
-function byBuyer(rows: readonly DayRow[]): BuyerLine[] {
-  const groups = new Map<string, DayRow[]>();
-  for (const r of rows) {
-    const list = groups.get(r.buyer);
-    if (list) list.push(r);
-    else groups.set(r.buyer, [r]);
-  }
-  return [...groups.entries()]
-    .map(([buyer, list]) => ({ buyer, ...totals(list) }))
-    .filter((b) => b.spendCents > 0 || b.ftd > 0)
-    .sort((a, b) => b.spendCents - a.spendCents || a.buyer.localeCompare(b.buyer, 'en', { numeric: true }));
-}
-
-function daily(rows: readonly DayRow[]): DailyPoint[] {
-  const days = new Map<string, DayRow[]>();
-  for (const r of rows) {
-    const list = days.get(r.date);
-    if (list) list.push(r);
-    else days.set(r.date, [r]);
-  }
-  return [...days.entries()]
-    .map(([date, list]) => ({ date, ...totals(list) }))
-    .filter((d) => d.spendCents > 0)
-    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+function buyersWithSpend(rows: readonly DayRow[], date: string): Set<string> {
+  const out = new Set<string>();
+  for (const r of rows) if (r.date === date && r.spendCents > 0) out.add(r.buyer);
+  return out;
 }
 
 /**
- * Сводка для экрана: «вчера» = последний заполненный день команды,
- * «месяц» = с 1-го числа месяца этого дня по этот день включительно.
- * CPD считается только внутри гео — общего CPD команды нет намеренно.
+ * Отчётный день («вчера»). Обычно — последний день со спендом.
+ * Если в нём спенд внесла не больше половины байеров, работавших в предыдущий
+ * день со спендом, день считается заполненным частично и отчётным становится предыдущий.
  */
-export function buildModel(sheetRows: readonly SheetRow[], geos: readonly GeoConfig[]): DashboardModel {
-  const rows = normalize(sheetRows);
-  const lastDay = lastFilledDay(rows);
-  if (lastDay === null) {
-    const empty: Totals = { spendCents: 0, ftd: 0, cpdCents: null };
-    return {
-      lastDay: null,
-      month: null,
-      geos: geos.map((geo) => ({ geo, day: empty, month: empty, daily: [], buyersDay: [], buyersMonth: [] })),
-    };
+export function reportDay(rows: readonly DayRow[]): { day: string | null; partial: PartialDay | null } {
+  const last = lastFilledDay(rows);
+  if (last === null) return { day: null, partial: null };
+  const prev = lastFilledDay(rows.filter((r) => r.date < last));
+  if (prev === null) return { day: last, partial: null };
+  const entered = buyersWithSpend(rows, last).size;
+  const expected = buyersWithSpend(rows, prev).size;
+  if (expected >= 2 && entered * 2 <= expected) {
+    return { day: prev, partial: { date: last, entered, expected } };
   }
-  const month = lastDay.slice(0, 7);
-  const inMonth = rows.filter((r) => r.date.startsWith(month) && r.date <= lastDay);
-  const summaries: GeoSummary[] = geos.map((geo) => {
-    const g = inMonth.filter((r) => r.geo === geo.code);
-    const d = g.filter((r) => r.date === lastDay);
-    return {
-      geo,
-      day: totals(d),
-      month: totals(g),
-      daily: daily(g),
-      buyersDay: byBuyer(d),
-      buyersMonth: byBuyer(g),
-    };
-  });
-  return { lastDay, month, geos: summaries };
+  return { day: last, partial: null };
 }
 
-/** Сумма строк таблицы байеров (для строки «Итого гео»). */
+export function totals(rows: readonly DayRow[]): Totals {
+  let spendCents = 0;
+  let ftd = 0;
+  let regs = 0;
+  for (const r of rows) {
+    spendCents += r.spendCents;
+    ftd += r.ftd;
+    regs += r.regs;
+  }
+  return { spendCents, ftd, regs, cpdCents: cpdCents(spendCents, ftd) };
+}
+
+/** Спенд сверх бенча × FTD, центы. 0 — в бенче или бенча нет. */
+export function overpayCents(t: Totals, benchCents: number | null): number {
+  if (benchCents === null) return 0;
+  return Math.max(0, t.spendCents - benchCents * t.ftd);
+}
+
+/** Сумма строк (для «Итого гео»). */
 export function sumLines(lines: readonly Totals[]): Totals {
   let spendCents = 0;
   let ftd = 0;
+  let regs = 0;
   for (const l of lines) {
     spendCents += l.spendCents;
     ftd += l.ftd;
+    regs += l.regs;
   }
-  return { spendCents, ftd, cpdCents: cpdCents(spendCents, ftd) };
+  return { spendCents, ftd, regs, cpdCents: cpdCents(spendCents, ftd) };
+}
+
+function groupBy<T>(items: readonly T[], key: (x: T) => string): Map<string, T[]> {
+  const out = new Map<string, T[]>();
+  for (const x of items) {
+    const k = key(x);
+    const list = out.get(k);
+    if (list) list.push(x);
+    else out.set(k, [x]);
+  }
+  return out;
+}
+
+const byBuyerName = (a: string, b: string): number => a.localeCompare(b, 'en', { numeric: true });
+
+function geoSummary(geo: GeoConfig, geoRows: readonly DayRow[], day: string, month: string): GeoSummary {
+  const inMonth = geoRows.filter((r) => r.date.startsWith(month) && r.date <= day);
+  const byDate = groupBy(inMonth, (r) => r.date);
+  const daily: DailyPoint[] = [...byDate.entries()]
+    .map(([date, list]) => ({ date, ...totals(list) }))
+    .filter((d) => d.spendCents > 0)
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
+
+  const buyersByDate: Record<string, BuyerDay[]> = {};
+  for (const [date, list] of byDate) {
+    buyersByDate[date] = [...groupBy(list, (r) => r.buyer).entries()]
+      .map(([buyer, rs]) => ({ buyer, ...totals(rs) }))
+      .filter((b) => b.spendCents > 0 || b.ftd > 0)
+      .sort((a, b) => b.spendCents - a.spendCents || byBuyerName(a.buyer, b.buyer));
+  }
+
+  const monthT = totals(inMonth);
+  const dayT = totals(inMonth.filter((r) => r.date === day));
+
+  const windowDays: DailyPoint[] = [];
+  for (let i = 1; i <= 7; i++) {
+    const d = addDays(day, -i);
+    const t = totals(geoRows.filter((r) => r.date === d));
+    if (t.spendCents > 0) windowDays.push({ date: d, ...t });
+  }
+  const avg7 =
+    windowDays.length >= 3
+      ? (() => {
+          const w = sumLines(windowDays);
+          return {
+            spendCents: Math.round(w.spendCents / windowDays.length),
+            ftd: Math.round((w.ftd * 10) / windowDays.length) / 10,
+            cpdCents: w.cpdCents,
+          };
+        })()
+      : null;
+
+  const last7Dates = Array.from({ length: 7 }, (_, i) => addDays(day, i - 6));
+  const buyers: BuyerSummary[] = [...groupBy(inMonth, (r) => r.buyer).entries()]
+    .map(([buyer, list]) => {
+      const m = totals(list);
+      const mine = geoRows.filter((r) => r.buyer === buyer);
+      return {
+        buyer,
+        day: totals(list.filter((r) => r.date === day)),
+        month: m,
+        shareBp: monthT.spendCents > 0 ? Math.round((m.spendCents * 10_000) / monthT.spendCents) : 0,
+        overpayCents: overpayCents(m, geo.benchCents),
+        last7: last7Dates.map((d) => ({ date: d, ...totals(mine.filter((r) => r.date === d)) })),
+      };
+    })
+    .filter((b) => b.month.spendCents > 0 || b.month.ftd > 0)
+    .sort((a, b) => b.overpayCents - a.overpayCents || b.month.spendCents - a.month.spendCents || byBuyerName(a.buyer, b.buyer));
+
+  return {
+    geo,
+    day: dayT,
+    month: monthT,
+    avg7,
+    headroomCents: geo.benchCents === null ? null : geo.benchCents * monthT.ftd - monthT.spendCents,
+    daily,
+    buyersByDate,
+    buyers,
+  };
+}
+
+/**
+ * Сводка для экрана. «Вчера» — отчётный день (см. reportDay), месяц — с 1-го
+ * числа месяца этого дня по этот день включительно. CPD — только внутри гео.
+ */
+export function buildModel(sheetRows: readonly SheetRow[], geos: readonly GeoConfig[]): DashboardModel {
+  const rows = normalize(sheetRows);
+  const { day, partial } = reportDay(rows);
+  if (day === null) {
+    const empty: Totals = { spendCents: 0, ftd: 0, regs: 0, cpdCents: null };
+    return {
+      lastDay: null,
+      month: null,
+      partial: null,
+      geos: geos.map((geo) => ({ geo, day: empty, month: empty, avg7: null, headroomCents: null, daily: [], buyersByDate: {}, buyers: [] })),
+    };
+  }
+  const month = day.slice(0, 7);
+  return {
+    lastDay: day,
+    month,
+    partial,
+    geos: geos.map((geo) => geoSummary(geo, rows.filter((r) => r.geo === geo.code), day, month)),
+  };
+}
+
+/** Гео с бенчами, изменёнными пользователем (центы); неизвестные коды игнорируются. */
+export function applyBenches(geos: readonly GeoConfig[], overrides: Readonly<Record<string, number>>): GeoConfig[] {
+  return geos.map((g) => {
+    const v = overrides[g.code];
+    return typeof v === 'number' && Number.isInteger(v) && v > 0 ? { ...g, benchCents: v } : g;
+  });
 }
