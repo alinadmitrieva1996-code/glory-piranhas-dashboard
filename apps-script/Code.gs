@@ -15,6 +15,13 @@
  */
 
 var CONFIG = {
+  /**
+   * ID таблицы команды (из ссылки docs.google.com/spreadsheets/d/<ID>/edit).
+   * Пусто — скрипт встроен в саму таблицу (Расширения → Apps Script).
+   * Заполнено — отдельный скрипт в аккаунте пользователя: так можно, если владелец
+   * таблицы другой аккаунт и встроенный скрипт нельзя развернуть.
+   */
+  SPREADSHEET_ID: '',
   /** Листы байеров. Имя листа = идентификатор байера в дашборде. */
   BUYER_SHEET_PATTERN: /^BUYER\d+$/,
   /** Строка с заголовками блоков гео вида «BUYER1 - AR». */
@@ -35,7 +42,7 @@ function doGet(e) {
     if (!expected) return json_({ ok: false, error: 'not_configured' });
     if (!safeEqual_(String(key), expected)) return json_({ ok: false, error: 'unauthorized' });
 
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var ss = openSpreadsheet_();
     return json_({
       ok: true,
       version: 1,
@@ -68,9 +75,13 @@ function rotateKey() {
 
 /** Проверка из редактора: сколько строк увидит приложение. */
 function preview() {
-  var rows = collectRows_(SpreadsheetApp.getActiveSpreadsheet());
+  var rows = collectRows_(openSpreadsheet_());
   Logger.log('Строк: ' + rows.length);
   Logger.log(JSON.stringify(rows.slice(-5), null, 2));
+}
+
+function openSpreadsheet_() {
+  return CONFIG.SPREADSHEET_ID ? SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID) : SpreadsheetApp.getActiveSpreadsheet();
 }
 
 function collectRows_(ss) {
