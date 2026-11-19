@@ -26,15 +26,3 @@ export function yesterdayMsk(now: Date): string {
   return t.toISOString().slice(0, 10);
 }
 
-/**
- * Насколько свежий отчётный день. «Вчера» — только если это действительно вчера по Москве;
- * иначе экран пишет «Последний день» и предупреждает, что за вчера данных нет.
- */
-export function freshness(reportDay: string | null, now: Date): { yesterday: string; isYesterday: boolean; yesterdayMissing: boolean } {
-  const yesterday = yesterdayMsk(now);
-  return {
-    yesterday,
-    isYesterday: reportDay === yesterday,
-    yesterdayMissing: reportDay === null || reportDay < yesterday,
-  };
-}

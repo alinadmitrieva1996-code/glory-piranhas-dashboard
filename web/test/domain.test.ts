@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { GEOS } from '../src/config.ts';
 import { dayShort, money0, money2, monthName } from '../src/domain/format.ts';
-import { applyBenches, buildModel, lastFilledDay, normalize, overpayCents, reportDay, sumLines } from '../src/domain/metrics.ts';
+import { applyBenches, buildModel, lastFilledDay, normalize, overpayCents, partialDay, sumLines } from '../src/domain/metrics.ts';
 import { cpdCents, toCents } from '../src/domain/money.ts';
 import { parsePayload } from '../src/domain/parse.ts';
-import { cpdStatus, freshness, worst, yesterdayMsk } from '../src/domain/status.ts';
+import { cpdStatus, worst, yesterdayMsk } from '../src/domain/status.ts';
 import type { SheetRow } from '../src/domain/types.ts';
 
 const row = (buyer: string, date: string, geo: string, spend: number, ftd: number, regs = 0): SheetRow => ({ buyer, date, geo, clicks: 0, regs, ftd, spend });
@@ -53,13 +53,16 @@ describe('parsePayload', () => {
 });
 
 describe('buildModel', () => {
-  const model = buildModel(ROWS, GEOS);
+  const NOW = new Date('2026-11-03T09:00:00Z'); // 12:00 МСК 3 ноября → вчера = 2 ноября
+  const model = buildModel(ROWS, GEOS, NOW);
   const ar = model.geos.find((g) => g.geo.code === 'AR');
   const et = model.geos.find((g) => g.geo.code === 'ET');
 
   it('находит последний день со спендом', () => {
     assert.equal(lastFilledDay(normalize(ROWS)), '2026-11-02');
     assert.equal(model.lastDay, '2026-11-02');
+    assert.equal(model.hasDayData, true);
+    assert.equal(model.dataThrough, '2026-11-02');
     assert.equal(model.month, '2026-11');
   });
 
@@ -99,33 +102,49 @@ describe('buildModel', () => {
   });
 
   it('пустые данные не ломают модель', () => {
-    const empty = buildModel([], GEOS);
-    assert.equal(empty.lastDay, null);
+    const empty = buildModel([], GEOS, NOW);
+    assert.equal(empty.hasDayData, false);
+    assert.equal(empty.dataThrough, null);
     assert.equal(empty.geos.length, GEOS.length);
   });
 });
 
 describe('отчётный день и бенчи', () => {
-  it('последний день, внесённый половиной байеров и меньше, считается частичным', () => {
-    const rs = normalize([
-      row('B1', '2026-11-16', 'AR', 100, 5), row('B2', '2026-11-16', 'AR', 100, 5), row('B3', '2026-11-16', 'ET', 50, 2), row('B4', '2026-11-16', 'AR', 10, 1),
-      row('B4', '2026-11-17', 'AR', 100, 5),
-    ]);
-    assert.deepEqual(reportDay(rs), { day: '2026-11-16', partial: { date: '2026-11-17', entered: 1, expected: 4 } });
+  const rs = normalize([
+    row('B1', '2026-11-16', 'AR', 100, 5), row('B2', '2026-11-16', 'AR', 100, 5), row('B3', '2026-11-16', 'ET', 50, 2), row('B4', '2026-11-16', 'AR', 10, 1),
+    row('B4', '2026-11-17', 'AR', 100, 5),
+    row('B1', '2026-11-18', 'AR', 100, 5), row('B2', '2026-11-18', 'AR', 100, 5), row('B3', '2026-11-18', 'AR', 100, 5),
+  ]);
+
+  it('день, внесённый половиной байеров и меньше, — частичный', () => {
+    assert.deepEqual(partialDay(rs, '2026-11-17'), { date: '2026-11-17', entered: 1, expected: 4 });
   });
 
-  it('если внесли больше половины — день полный', () => {
-    const rs = normalize([
-      row('B1', '2026-11-16', 'AR', 100, 5), row('B2', '2026-11-16', 'AR', 100, 5), row('B3', '2026-11-16', 'AR', 100, 5),
-      row('B1', '2026-11-17', 'AR', 100, 5), row('B2', '2026-11-17', 'AR', 100, 5),
-    ]);
-    assert.deepEqual(reportDay(rs), { day: '2026-11-17', partial: null });
+  it('больше половины — полный; пустой день — не частичный', () => {
+    assert.equal(partialDay(rs, '2026-11-18'), null);
+    assert.equal(partialDay(rs, '2026-11-19'), null);
   });
 
-  it('модель берёт отчётный день, а не частичный', () => {
-    const m = buildModel([...ROWS, row('BUYER9', '2026-11-03', 'AR', 50, 1)], GEOS);
-    assert.equal(m.lastDay, '2026-11-02');
+  it('за вчера данных нет: «вчера» остаётся вчерашним днём, а не подменяется предыдущим', () => {
+    const m = buildModel(ROWS, GEOS, new Date('2026-11-05T09:00:00Z')); // вчера = 4 ноября, спенд внесён по 2-е
+    assert.equal(m.lastDay, '2026-11-04');
+    assert.equal(m.hasDayData, false);
+    assert.equal(m.dataThrough, '2026-11-02');
+    const ar = m.geos.find((g) => g.geo.code === 'AR');
+    assert.deepEqual(ar?.day, { spendCents: 0, ftd: 0, regs: 0, cpdCents: null });
+    assert.equal(ar?.month.spendCents, 93030); // месяц накопительно, без прошлого месяца
+  });
+
+  it('вчера внесено частично: показываем вчера как есть и помечаем', () => {
+    const m = buildModel([...ROWS, row('BUYER9', '2026-11-03', 'AR', 50, 1)], GEOS, new Date('2026-11-04T09:00:00Z'));
+    assert.equal(m.lastDay, '2026-11-03');
     assert.equal(m.partial?.date, '2026-11-03');
+    assert.equal(m.geos.find((g) => g.geo.code === 'AR')?.day.spendCents, 5000);
+  });
+
+  it('строки после вчера (сегодня) в расчёт не идут', () => {
+    const m = buildModel([...ROWS, row('BUYER1', '2026-11-03', 'AR', 999, 1)], GEOS, new Date('2026-11-03T09:00:00Z'));
+    assert.equal(m.geos.find((g) => g.geo.code === 'AR')?.month.spendCents, 93030);
   });
 
   it('переплата и бенч пользователя', () => {
@@ -154,19 +173,6 @@ describe('cpdStatus', () => {
   it('worst выбирает худший статус', () => {
     assert.equal(worst('ok', 'warn'), 'warn');
     assert.equal(worst('bad', 'none'), 'bad');
-  });
-});
-
-describe('свежесть данных', () => {
-  const now = new Date('2026-11-19T07:22:00Z'); // 10:22 МСК 19 ноября
-  it('последний день 17-е, а вчера 18-е — «вчера» не пишем и предупреждаем', () => {
-    assert.deepEqual(freshness('2026-11-17', now), { yesterday: '2026-11-18', isYesterday: false, yesterdayMissing: true });
-  });
-  it('последний день и есть вчера', () => {
-    assert.deepEqual(freshness('2026-11-18', now), { yesterday: '2026-11-18', isYesterday: true, yesterdayMissing: false });
-  });
-  it('нет данных вовсе', () => {
-    assert.equal(freshness(null, now).yesterdayMissing, true);
   });
 });
 

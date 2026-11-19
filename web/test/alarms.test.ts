@@ -41,7 +41,7 @@ describe('алармы', () => {
   });
 
   it('при CPD в пределах +5% к бенчу лида не дёргаем', () => {
-    const r = evaluateAlarms([row('BUYER9', '2026-11-16', 'AR', 420, 20)], GEOS, at('2026-11-16T12:00:00Z')); // $21,00 = ровно +5%
+    const r = evaluateAlarms([row('BUYER9', '2026-11-16', 'AR', 420, 20)], GEOS, at('2026-11-17T09:00:00Z')); // $21,00 = ровно +5%
     assert.equal(r.results.find((x) => x.id === 'lead_not_stopped')?.hits.length, 0);
   });
 
@@ -64,7 +64,7 @@ describe('алармы', () => {
   });
 
   it('месяц у границы: 95–100% бенча', () => {
-    const r = evaluateAlarms([row('BUYER1', '2026-11-16', 'AR', 1950, 100)], GEOS, at('2026-11-16T12:00:00Z')); // $19,50
+    const r = evaluateAlarms([row('BUYER1', '2026-11-16', 'AR', 1950, 100)], GEOS, at('2026-11-17T09:00:00Z')); // $19,50
     const ids = r.results.filter((x) => x.hits.length).map((x) => x.id);
     assert.ok(ids.includes('geo_month_near_bench'));
     assert.ok(!ids.includes('geo_month_over_bench'));

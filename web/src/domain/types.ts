@@ -94,11 +94,15 @@ export interface PartialDay {
 }
 
 export interface DashboardModel {
-  /** Отчётный день («вчера»): последний полностью заполненный. null — данных нет. */
-  lastDay: string | null;
-  /** Месяц отчётного дня, YYYY-MM. */
-  month: string | null;
-  /** Последний день в таблице заполнен частично — показываем предыдущий. */
+  /** «Вчера» — вчерашний день по Москве, YYYY-MM-DD. */
+  lastDay: string;
+  /** Месяц вчерашнего дня, YYYY-MM. */
+  month: string;
+  /** Есть ли в таблице спенд или FTD за вчера. Нет — в карточке «Вчера» прочерки. */
+  hasDayData: boolean;
+  /** Последний день месяца, по который внесены данные (для подписи накопительного блока). */
+  dataThrough: string | null;
+  /** Вчерашний день внесён частично (половина байеров или меньше). */
   partial: PartialDay | null;
   geos: GeoSummary[];
 }

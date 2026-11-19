@@ -1,6 +1,6 @@
 import { ALARM_THRESHOLDS as T } from '../config.ts';
 import { dayShort, money0, money2 } from './format.ts';
-import { addDays, lastFilledDay, normalize, reportDay } from './metrics.ts';
+import { addDays, normalize, partialDay } from './metrics.ts';
 import { cpdCents } from './money.ts';
 import { yesterdayMsk } from './status.ts';
 import type { DayRow, GeoConfig, SheetRow, Totals } from './types.ts';
@@ -149,24 +149,22 @@ function mskHour(now: Date): number {
 }
 
 /**
- * Проверяет все алармы по последнему внесённому дню.
+ * Проверяет все алармы за вчера (по Москве); месячные — накопительно с 1-го по вчера.
  * Возвращает каждый аларм со списком срабатываний (пустой — не сработал).
  */
 export function evaluateAlarms(sheetRows: readonly SheetRow[], geos: readonly GeoConfig[], now: Date): { lastDay: string | null; results: AlarmResult[] } {
-  const rows = normalize(sheetRows);
-  const { day: lastDay, partial } = reportDay(rows);
-  const lastAny = lastFilledDay(rows);
+  const yesterday = yesterdayMsk(now);
+  const rows = normalize(sheetRows).filter((r) => r.date <= yesterday);
+  const lastDay: string | null = yesterday;
+  const partial = partialDay(rows, yesterday);
+  const hasYesterday = rows.some((r) => r.date === yesterday && (r.spendCents > 0 || r.ftd > 0));
   const hits = new Map<string, AlarmHit[]>(ALARM_DEFS.map((d) => [d.id, []]));
   const push = (id: string, hit: AlarmHit): void => {
     hits.get(id)?.push(hit);
   };
 
-  const yesterday = yesterdayMsk(now);
-  if (mskHour(now) >= T.dataDeadlineHourMsk && (lastAny === null || lastAny < yesterday)) {
-    push('data_missing', {
-      geo: null,
-      text: lastAny === null ? `Нет данных за ${dayShort(yesterday)}: таблица пустая.` : `Нет данных за ${dayShort(yesterday)}. Последний внесённый день — ${dayShort(lastAny)}.`,
-    });
+  if (mskHour(now) >= T.dataDeadlineHourMsk && !hasYesterday) {
+    push('data_missing', { geo: null, text: `Нет данных за ${dayShort(yesterday)}.` });
   } else if (mskHour(now) >= T.dataDeadlineHourMsk && partial && partial.date === yesterday) {
     push('data_missing', { geo: null, text: `${dayShort(partial.date)} внесли ${partial.entered} из ${partial.expected} байеров.` });
   }

@@ -1,4 +1,5 @@
 import { cpdCents, toCents } from './money.ts';
+import { yesterdayMsk } from './status.ts';
 import type { BuyerDay, BuyerSummary, DailyPoint, DashboardModel, DayRow, GeoConfig, GeoSummary, PartialDay, SheetRow, Totals } from './types.ts';
 
 export function normalize(rows: readonly SheetRow[]): DayRow[] {
@@ -26,21 +27,16 @@ function buyersWithSpend(rows: readonly DayRow[], date: string): Set<string> {
 }
 
 /**
- * Отчётный день («вчера»). Обычно — последний день со спендом.
- * Если в нём спенд внесла не больше половины байеров, работавших в предыдущий
- * день со спендом, день считается заполненным частично и отчётным становится предыдущий.
+ * Внесён ли день частично: спенд в нём внесла половина байеров или меньше
+ * от работавших в предыдущий день со спендом. null — день пустой или полный.
  */
-export function reportDay(rows: readonly DayRow[]): { day: string | null; partial: PartialDay | null } {
-  const last = lastFilledDay(rows);
-  if (last === null) return { day: null, partial: null };
-  const prev = lastFilledDay(rows.filter((r) => r.date < last));
-  if (prev === null) return { day: last, partial: null };
-  const entered = buyersWithSpend(rows, last).size;
+export function partialDay(rows: readonly DayRow[], day: string): PartialDay | null {
+  const entered = buyersWithSpend(rows, day).size;
+  if (entered === 0) return null;
+  const prev = lastFilledDay(rows.filter((r) => r.date < day));
+  if (prev === null) return null;
   const expected = buyersWithSpend(rows, prev).size;
-  if (expected >= 2 && entered * 2 <= expected) {
-    return { day: prev, partial: { date: last, entered, expected } };
-  }
-  return { day: last, partial: null };
+  return expected >= 2 && entered * 2 <= expected ? { date: day, entered, expected } : null;
 }
 
 export function totals(rows: readonly DayRow[]): Totals {
@@ -154,26 +150,21 @@ function geoSummary(geo: GeoConfig, geoRows: readonly DayRow[], day: string, mon
 }
 
 /**
- * Сводка для экрана. «Вчера» — отчётный день (см. reportDay), месяц — с 1-го
- * числа месяца этого дня по этот день включительно. CPD — только внутри гео.
+ * Сводка для экрана. «Вчера» — всегда вчерашний день по Москве: если данных за него нет,
+ * экран показывает прочерки, а не предыдущий день. Месяц — накопительно с 1-го числа
+ * месяца вчерашнего дня по вчера включительно. CPD — только внутри гео.
  */
-export function buildModel(sheetRows: readonly SheetRow[], geos: readonly GeoConfig[]): DashboardModel {
-  const rows = normalize(sheetRows);
-  const { day, partial } = reportDay(rows);
-  if (day === null) {
-    const empty: Totals = { spendCents: 0, ftd: 0, regs: 0, cpdCents: null };
-    return {
-      lastDay: null,
-      month: null,
-      partial: null,
-      geos: geos.map((geo) => ({ geo, day: empty, month: empty, avg7: null, headroomCents: null, daily: [], buyersByDate: {}, buyers: [] })),
-    };
-  }
+export function buildModel(sheetRows: readonly SheetRow[], geos: readonly GeoConfig[], now: Date): DashboardModel {
+  const day = yesterdayMsk(now);
   const month = day.slice(0, 7);
+  const rows = normalize(sheetRows).filter((r) => r.date <= day);
+  const hasDayData = rows.some((r) => r.date === day && (r.spendCents > 0 || r.ftd > 0));
   return {
     lastDay: day,
     month,
-    partial,
+    hasDayData,
+    dataThrough: lastFilledDay(rows.filter((r) => r.date.startsWith(month))),
+    partial: partialDay(rows, day),
     geos: geos.map((geo) => geoSummary(geo, rows.filter((r) => r.geo === geo.code), day, month)),
   };
 }

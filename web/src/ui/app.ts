@@ -3,7 +3,7 @@ import { ALARM_DEFS, type AlarmResult, type AlarmSeverity, evaluateAlarms, resol
 import { dayMedium, int, money0, money2, monthName, pct, rangeShort, timeLabel } from '../domain/format.ts';
 import { applyBenches, buildModel, sumLines } from '../domain/metrics.ts';
 import { parsePayload } from '../domain/parse.ts';
-import { cpdStatus, freshness, worst } from '../domain/status.ts';
+import { cpdStatus, worst } from '../domain/status.ts';
 import type { BuyerSummary, DashboardModel, GeoConfig, GeoSummary, SheetRow, StatusLevel, Totals } from '../domain/types.ts';
 import { renderChart } from './chart.ts';
 import { h } from './dom.ts';
@@ -146,7 +146,7 @@ export class DashboardApp {
 
   private draw(): void {
     const geos = this.geos();
-    const model = this.loaded ? buildModel(this.rows, geos) : null;
+    const model = this.loaded ? buildModel(this.rows, geos, new Date()) : null;
     const results = this.loaded ? evaluateAlarms(this.rows, geos, new Date()).results : [];
     const main = h('main', { class: 'panel' });
     if (ui.view === ALARMS_VIEW) main.append(this.alarmsView(model, results));
@@ -221,16 +221,9 @@ export class DashboardApp {
     }
     const err = this.meta.error ?? this.dataError;
     if (err) out.push(h('div', { class: 'note note-bad', role: 'alert' }, icon('info'), h('span', {}, h('b', {}, 'Не удалось обновить. '), err)));
-    const fr = freshness(model?.lastDay ?? null, new Date());
-    // Вчера целиком не внесено (не путать с частичным днём — о нём следующая плашка).
-    if (model?.lastDay && fr.yesterdayMissing && model.partial?.date !== fr.yesterday) {
-      out.push(
-        h('div', { class: 'note note-warn', role: 'status' }, icon('info'), h('span', {}, h('b', {}, `За ${dayMedium(fr.yesterday)} данных ещё нет`), ` — показываем ${dayMedium(model.lastDay)}, последний внесённый день.`)),
-      );
-    }
     if (model?.partial) {
       const p = model.partial;
-      out.push(h('div', { class: 'note note-warn', role: 'status' }, icon('info'), h('span', {}, h('b', {}, `${dayMedium(p.date)} внесли ${p.entered} из ${p.expected} байеров`), ` — показываем ${Number(model.lastDay?.slice(8, 10))}-е.`)));
+      out.push(h('div', { class: 'note note-warn', role: 'status' }, icon('info'), h('span', {}, h('b', {}, `${dayMedium(p.date)} внесли ${p.entered} из ${p.expected} байеров`), ' — цифры за вчера неполные.')));
     }
     return out;
   }
@@ -287,11 +280,11 @@ export class DashboardApp {
     const page = h('div', { class: 'page' }, this.topbar(cfg?.name ?? 'Гео'));
     if (!cfg) return page;
     page.append(
-      h('div', { class: 'title-row' }, h('div', { class: 'title' }, h('h1', {}, cfg.name), h('span', { class: 'sub' }, model?.lastDay ? `Данные по ${dayMedium(model.lastDay)}` : 'Нет данных')), this.benchControl(cfg)),
+      h('div', { class: 'title-row' }, h('div', { class: 'title' }, h('h1', {}, cfg.name), h('span', { class: 'sub' }, model?.dataThrough ? `Последние данные — ${dayMedium(model.dataThrough)}` : 'Данных за месяц нет')), this.benchControl(cfg)),
       ...this.banners(model),
     );
     const g = model?.geos.find((x) => x.geo.code === cfg.code);
-    if (!model || !g || !model.lastDay) {
+    if (!model || !g) {
       page.append(h('p', { class: 'muted' }, this.emptyText()));
       return page;
     }
@@ -315,11 +308,6 @@ export class DashboardApp {
     return h('div', { class: 'insight' }, icon('sparkle'), h('span', {}, h('b', {}, head), tail ? ' ' + tail : ''));
   }
 
-  /** «Вчера», только если отчётный день и правда вчерашний; иначе «Последний день». */
-  private dayTitle(model: DashboardModel): string {
-    return freshness(model.lastDay, new Date()).isYesterday ? 'Вчера' : 'Последний день';
-  }
-
   private kpi(label: string, value: string, valueClass: string, sub: (Node | string)[]): HTMLElement {
     return h('div', { class: 'kpi' }, h('span', { class: 'kpi-label' }, label), h('span', { class: `kpi-value ${valueClass}` }, value), h('span', { class: 'kpi-sub' }, ...sub));
   }
@@ -332,23 +320,27 @@ export class DashboardApp {
     const yesterday = h(
       'article',
       { class: 'card card-hero' },
-      h('div', { class: 'card-head' }, h('h2', {}, this.dayTitle(model)), h('span', { class: 'muted' }, dayMedium(model.lastDay))),
+      h('div', { class: 'card-head' }, h('h2', {}, 'Вчера'), h('span', { class: 'muted' }, dayMedium(model.lastDay))),
       h(
         'div',
         { class: 'card-cols' },
-        this.kpi('CPD гео', cpdText(g.day), levelClass(dSt), [h('b', { class: levelClass(dSt) }, deltaText(g.day, bench)), ` · ${int(g.day.ftd)} FTD`]),
-        this.kpi('Спенд гео', money2(g.day.spendCents), '', [vsAvg(g.day.spendCents, g.avg7?.spendCents)]),
+        ...(model.hasDayData && (g.day.spendCents > 0 || g.day.ftd > 0)
+          ? [
+              this.kpi('CPD гео', cpdText(g.day), levelClass(dSt), [h('b', { class: levelClass(dSt) }, deltaText(g.day, bench)), ` · ${int(g.day.ftd)} FTD`]),
+              this.kpi('Спенд гео', money2(g.day.spendCents), '', [vsAvg(g.day.spendCents, g.avg7?.spendCents)]),
+            ]
+          : [this.kpi('CPD гео', '—', 'st-none', ['Данных нет']), this.kpi('Спенд гео', '—', 'st-none', ['Данных нет'])]),
       ),
     );
     const month = h(
       'article',
       { class: 'card' },
-      h('div', { class: 'card-head' }, h('h2', {}, `Месяц · ${monthName(model.month).toLowerCase()} ${model.month?.slice(0, 4) ?? ''}`), h('span', { class: 'muted' }, rangeShort(`${model.month}-01`, model.lastDay ?? ''))),
+      h('div', { class: 'card-head' }, h('h2', {}, `Месяц · ${monthName(model.month).toLowerCase()} ${model.month?.slice(0, 4) ?? ''}`), h('span', { class: 'muted' }, model.dataThrough ? rangeShort(`${model.month}-01`, model.dataThrough) : 'данных нет')),
       h(
         'div',
         { class: 'card-cols' },
         this.kpi('CPD гео', cpdText(g.month), levelClass(mSt), [h('b', { class: levelClass(mSt) }, deltaText(g.month, bench)), ` · ${int(g.month.ftd)} FTD`]),
-        this.kpi('Спенд гео', money2(g.month.spendCents), '', room === null ? ['Бенч не задан'] : [room >= 0 ? 'Запас до бенча ' : 'Перерасход ', h('b', { class: room >= 0 ? 'st-ok' : 'st-bad' }, money0(Math.abs(room)))]),
+        this.kpi('Спенд гео', g.month.spendCents ? money2(g.month.spendCents) : '—', g.month.spendCents ? '' : 'st-none', room === null ? ['Бенч не задан'] : [room >= 0 ? 'Запас до бенча ' : 'Перерасход ', h('b', { class: room >= 0 ? 'st-ok' : 'st-bad' }, money0(Math.abs(room)))]),
       ),
     );
     return h('section', { class: 'cards', 'aria-label': 'Вчера и месяц' }, yesterday, month);
@@ -400,7 +392,7 @@ export class DashboardApp {
     const head = h(
       'thead',
       {},
-      h('tr', {}, h('th', { scope: 'col', rowspan: 2 }, 'Байер'), h('th', { scope: 'col', rowspan: 2 }, 'Статус'), h('th', { scope: 'colgroup', colspan: 3, class: 'grp' }, `${this.dayTitle(model)} · ${dayMedium(model.lastDay)}`), h('th', { scope: 'colgroup', colspan: 5, class: 'grp' }, monthName(model.month)), h('th', { scope: 'col', rowspan: 2, class: 'sep' }, 'Спенд 7 дней')),
+      h('tr', {}, h('th', { scope: 'col', rowspan: 2 }, 'Байер'), h('th', { scope: 'col', rowspan: 2 }, 'Статус'), h('th', { scope: 'colgroup', colspan: 3, class: 'grp' }, `Вчера · ${dayMedium(model.lastDay)}`), h('th', { scope: 'colgroup', colspan: 5, class: 'grp' }, monthName(model.month)), h('th', { scope: 'col', rowspan: 2, class: 'sep' }, 'Спенд 7 дней')),
       h('tr', {}, th('Спенд', 'num sep'), th('FTD', 'num'), th('CPD', 'num'), th('Спенд', 'num sep'), th('Доля', 'num'), th('CPD', 'num'), th('Reg→FTD', 'num'), th('Переплата', 'num')),
     );
     const body = h('tbody');
@@ -475,7 +467,7 @@ export class DashboardApp {
         'ul',
         {},
         h('li', {}, 'Спенд — чистый спенд Facebook без комиссий. CPD = спенд / FTD, только внутри гео.'),
-        h('li', {}, '«Вчера» — последний полный день: если последний день внесла половина байеров или меньше, показываем предыдущий.'),
+        h('li', {}, '«Вчера» — вчерашний день по Москве; если его ещё не внесли — прочерки. Месяц — накопительно с 1-го числа, растёт по мере внесения данных.'),
         h('li', {}, 'Переплата = спенд − бенч × FTD за месяц. Запас до бенча = бенч × FTD − спенд.'),
         h('li', {}, 'Reg→FTD = FTD / регистрации. «У границы» — CPD от 95% до 100% бенча.'),
         h('li', {}, 'Бенч меняется сверху справа и сохраняется в приложении; весь экран и алармы пересчитываются.'),
@@ -513,7 +505,7 @@ export class DashboardApp {
       h(
         'div',
         { class: 'title-row' },
-        h('div', { class: 'title' }, h('h1', {}, 'Алармы'), h('span', { class: 'sub' }, model?.lastDay ? `По ${dayMedium(model.lastDay)} · включено ${onCount} из ${ALARM_DEFS.length} · сработало ${firing.length}` : 'Нет данных для проверки')),
+        h('div', { class: 'title' }, h('h1', {}, 'Алармы'), h('span', { class: 'sub' }, model ? `За ${dayMedium(model.lastDay)} · включено ${onCount} из ${ALARM_DEFS.length} · сработало ${firing.length}` : 'Нет данных для проверки')),
         h('div', { class: 'head-actions' }, allOn, allOff),
       ),
       ...this.banners(model),
