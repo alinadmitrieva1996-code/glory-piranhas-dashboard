@@ -1,0 +1,308 @@
+
+> piranhas-dashboard-web@0.1.0 check
+> npm run typecheck && npm run test && npm run build
+
+
+> piranhas-dashboard-web@0.1.0 typecheck
+> tsc -p tsconfig.json
+
+
+> piranhas-dashboard-web@0.1.0 test
+> node --test test/*.test.ts
+
+TAP version 13
+# Subtest: алармы
+    # Subtest: все 10 условий описаны, id уникальны
+    ok 1 - все 10 условий описаны, id уникальны
+      ---
+      duration_ms: 1.776969
+      type: 'test'
+      ...
+    # Subtest: не остановили дорогой залив: спенд > $300 и CPD > бенч +5%
+    ok 2 - не остановили дорогой залив: спенд > $300 и CPD > бенч +5%
+      ---
+      duration_ms: 7.900751
+      type: 'test'
+      ...
+    # Subtest: при CPD в пределах +5% к бенчу лида не дёргаем
+    ok 3 - при CPD в пределах +5% к бенчу лида не дёргаем
+      ---
+      duration_ms: 0.803404
+      type: 'test'
+      ...
+    # Subtest: спенд без FTD
+    ok 4 - спенд без FTD
+      ---
+      duration_ms: 0.800185
+      type: 'test'
+      ...
+    # Subtest: байер выше бенча 2 дня подряд
+    ok 5 - байер выше бенча 2 дня подряд
+      ---
+      duration_ms: 0.733868
+      type: 'test'
+      ...
+    # Subtest: гео за вчера выше бенча: AR (из-за BUYER4/BUYER2) и ET
+    ok 6 - гео за вчера выше бенча: AR (из-за BUYER4/BUYER2) и ET
+      ---
+      duration_ms: 0.673842
+      type: 'test'
+      ...
+    # Subtest: месяц: AR перешёл бенч ($8 450 / 414 = $20,41)
+    ok 7 - месяц: AR перешёл бенч ($8 450 / 414 = $20,41)
+      ---
+      duration_ms: 1.205911
+      type: 'test'
+      ...
+    # Subtest: месяц у границы: 95–100% бенча
+    ok 8 - месяц у границы: 95–100% бенча
+      ---
+      duration_ms: 0.66649
+      type: 'test'
+      ...
+    # Subtest: скачок CPD и падение спенда к среднему за 7 дней
+    ok 9 - скачок CPD и падение спенда к среднему за 7 дней
+      ---
+      duration_ms: 1.568754
+      type: 'test'
+      ...
+    # Subtest: гео без бенча тратит
+    ok 10 - гео без бенча тратит
+      ---
+      duration_ms: 1.259801
+      type: 'test'
+      ...
+    # Subtest: вчера не внесено — только после 10:00 МСК
+    ok 11 - вчера не внесено — только после 10:00 МСК
+      ---
+      duration_ms: 2.20524
+      type: 'test'
+      ...
+    # Subtest: пустые данные: срабатывает только «не внесено»
+    ok 12 - пустые данные: срабатывает только «не внесено»
+      ---
+      duration_ms: 0.389781
+      type: 'test'
+      ...
+    # Subtest: addDays переходит через месяц
+    ok 13 - addDays переходит через месяц
+      ---
+      duration_ms: 0.201162
+      type: 'test'
+      ...
+    # Subtest: resolveEnabled: по умолчанию всё включено, мусор игнорируется
+    ok 14 - resolveEnabled: по умолчанию всё включено, мусор игнорируется
+      ---
+      duration_ms: 0.288038
+      type: 'test'
+      ...
+    1..14
+ok 1 - алармы
+  ---
+  duration_ms: 24.282874
+  type: 'suite'
+  ...
+# Subtest: money
+    # Subtest: переводит доллары в центы без ошибок float
+    ok 1 - переводит доллары в центы без ошибок float
+      ---
+      duration_ms: 1.234483
+      type: 'test'
+      ...
+    # Subtest: считает CPD в центах и null без FTD
+    ok 2 - считает CPD в центах и null без FTD
+      ---
+      duration_ms: 0.2169
+      type: 'test'
+      ...
+    1..2
+ok 2 - money
+  ---
+  duration_ms: 2.925661
+  type: 'suite'
+  ...
+# Subtest: parsePayload
+    # Subtest: принимает корректный ответ и пропускает битые строки
+    ok 1 - принимает корректный ответ и пропускает битые строки
+      ---
+      duration_ms: 0.970218
+      type: 'test'
+      ...
+    # Subtest: возвращает понятную ошибку на отказ скрипта
+    ok 2 - возвращает понятную ошибку на отказ скрипта
+      ---
+      duration_ms: 0.378826
+      type: 'test'
+      ...
+    # Subtest: отклоняет не-объект
+    ok 3 - отклоняет не-объект
+      ---
+      duration_ms: 0.20653
+      type: 'test'
+      ...
+    1..3
+ok 3 - parsePayload
+  ---
+  duration_ms: 1.931672
+  type: 'suite'
+  ...
+# Subtest: buildModel
+    # Subtest: находит последний день со спендом
+    ok 1 - находит последний день со спендом
+      ---
+      duration_ms: 0.611797
+      type: 'test'
+      ...
+    # Subtest: считает «вчера» и месяц по гео, без прошлого месяца
+    ok 2 - считает «вчера» и месяц по гео, без прошлого месяца
+      ---
+      duration_ms: 1.601595
+      type: 'test'
+      ...
+    # Subtest: не смешивает гео
+    ok 3 - не смешивает гео
+      ---
+      duration_ms: 0.335548
+      type: 'test'
+      ...
+    # Subtest: байеры: сортировка по переплате, вчера и месяц, доля спенда
+    ok 4 - байеры: сортировка по переплате, вчера и месяц, доля спенда
+      ---
+      duration_ms: 0.564128
+      type: 'test'
+      ...
+    # Subtest: запас до бенча: бенч × FTD − спенд
+    ok 5 - запас до бенча: бенч × FTD − спенд
+      ---
+      duration_ms: 0.416002
+      type: 'test'
+      ...
+    # Subtest: график — только дни со спендом, по порядку
+    ok 6 - график — только дни со спендом, по порядку
+      ---
+      duration_ms: 0.20452
+      type: 'test'
+      ...
+    # Subtest: пустые данные не ломают модель
+    ok 7 - пустые данные не ломают модель
+      ---
+      duration_ms: 0.40205
+      type: 'test'
+      ...
+    1..7
+ok 4 - buildModel
+  ---
+  duration_ms: 4.717671
+  type: 'suite'
+  ...
+# Subtest: отчётный день и бенчи
+    # Subtest: день, внесённый половиной байеров и меньше, — частичный
+    ok 1 - день, внесённый половиной байеров и меньше, — частичный
+      ---
+      duration_ms: 0.488757
+      type: 'test'
+      ...
+    # Subtest: больше половины — полный; пустой день — не частичный
+    ok 2 - больше половины — полный; пустой день — не частичный
+      ---
+      duration_ms: 0.170331
+      type: 'test'
+      ...
+    # Subtest: за вчера данных нет: «вчера» остаётся вчерашним днём, а не подменяется предыдущим
+    ok 3 - за вчера данных нет: «вчера» остаётся вчерашним днём, а не подменяется предыдущим
+      ---
+      duration_ms: 0.689862
+      type: 'test'
+      ...
+    # Subtest: вчера внесено частично: показываем вчера как есть и помечаем
+    ok 4 - вчера внесено частично: показываем вчера как есть и помечаем
+      ---
+      duration_ms: 0.715675
+      type: 'test'
+      ...
+    # Subtest: строки после вчера (сегодня) в расчёт не идут
+    ok 5 - строки после вчера (сегодня) в расчёт не идут
+      ---
+      duration_ms: 0.495188
+      type: 'test'
+      ...
+    # Subtest: переплата и бенч пользователя
+    ok 6 - переплата и бенч пользователя
+      ---
+      duration_ms: 0.375781
+      type: 'test'
+      ...
+    1..6
+ok 5 - отчётный день и бенчи
+  ---
+  duration_ms: 4.397452
+  type: 'suite'
+  ...
+# Subtest: cpdStatus
+    # Subtest: выше бенча — красный с процентом
+    ok 1 - выше бенча — красный с процентом
+      ---
+      duration_ms: 0.35904
+      type: 'test'
+      ...
+    # Subtest: 95–100% бенча — у границы, ровно бенч — тоже
+    ok 2 - 95–100% бенча — у границы, ровно бенч — тоже
+      ---
+      duration_ms: 0.196455
+      type: 'test'
+      ...
+    # Subtest: спенд без FTD — красный, бенча нет — серый
+    ok 3 - спенд без FTD — красный, бенча нет — серый
+      ---
+      duration_ms: 0.185536
+      type: 'test'
+      ...
+    # Subtest: worst выбирает худший статус
+    ok 4 - worst выбирает худший статус
+      ---
+      duration_ms: 0.18054
+      type: 'test'
+      ...
+    1..4
+ok 6 - cpdStatus
+  ---
+  duration_ms: 1.313595
+  type: 'suite'
+  ...
+# Subtest: даты и формат
+    # Subtest: вчера по Москве
+    ok 1 - вчера по Москве
+      ---
+      duration_ms: 0.214745
+      type: 'test'
+      ...
+    # Subtest: подписи
+    ok 2 - подписи
+      ---
+      duration_ms: 0.738809
+      type: 'test'
+      ...
+    1..2
+ok 7 - даты и формат
+  ---
+  duration_ms: 1.114326
+  type: 'suite'
+  ...
+1..7
+# tests 38
+# suites 7
+# pass 38
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 355.150002
+
+> piranhas-dashboard-web@0.1.0 build
+> node scripts/build.mjs
+
+
+  dist/app.js  44.3kb
+
+⚡ Done in 61ms
+web/dist готов

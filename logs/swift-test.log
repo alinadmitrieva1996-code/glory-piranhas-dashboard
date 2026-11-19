@@ -1,0 +1,78 @@
+Building for debugging...
+[0/12] Write sources
+[0/12] /Users/runner/work/glory-piranhas-dashboard/glory-piranhas-dashboard/macos/.build/x86_64-apple-macosx/debug/PiranhasDashboardPackageTests.derived/runner.swift
+[2/12] Write sources
+[5/12] Write PiranhasDashboard-entitlement.plist
+[6/12] Write swift-version--79AA4F9932D1E87A.txt
+[8/17] Compiling PiranhasCore AlarmPreferences.swift
+[9/17] Compiling PiranhasCore BenchPreferences.swift
+[10/17] Compiling PiranhasCore SnapshotStore.swift
+[11/17] Emitting module PiranhasCore
+[12/17] Compiling PiranhasCore DataClient.swift
+[13/18] Compiling PiranhasCore SourceSettings.swift
+[14/26] Emitting module PiranhasDashboard
+[15/27] Compiling PiranhasDashboard PiranhasDashboardApp.swift
+[16/27] Compiling PiranhasDashboard AppModel.swift
+[17/27] Compiling PiranhasDashboard ContentView.swift
+[18/27] Compiling PiranhasDashboard DashboardWebView.swift
+[19/27] Compiling PiranhasDashboard Keychain.swift
+[20/27] Compiling PiranhasDashboard SettingsView.swift
+[20/27] Write Objects.LinkFileList
+[21/27] Linking PiranhasDashboard
+[22/27] Applying PiranhasDashboard
+[24/27] Compiling PiranhasCoreTests PiranhasCoreTests.swift
+[25/27] Emitting module PiranhasCoreTests
+[26/29] Compiling PiranhasDashboardPackageTests runner.swift
+[27/29] Emitting module PiranhasDashboardPackageTests
+[27/29] Write Objects.LinkFileList
+[28/29] Linking PiranhasDashboardPackageTests
+Build complete! (64.44s)
+Test Suite 'All tests' started at 2026-11-19 08:03:30.261.
+Test Suite 'PiranhasDashboardPackageTests.xctest' started at 2026-11-19 08:03:30.264.
+Test Suite 'AlarmPreferencesTests' started at 2026-11-19 08:03:30.265.
+Test Case '-[PiranhasCoreTests.AlarmPreferencesTests testRoundTripThroughDefaults]' started.
+Test Case '-[PiranhasCoreTests.AlarmPreferencesTests testRoundTripThroughDefaults]' passed (0.012 seconds).
+Test Case '-[PiranhasCoreTests.AlarmPreferencesTests testSanitizeKeepsOnlyBooleansWithValidIDs]' started.
+Test Case '-[PiranhasCoreTests.AlarmPreferencesTests testSanitizeKeepsOnlyBooleansWithValidIDs]' passed (0.007 seconds).
+Test Suite 'AlarmPreferencesTests' passed at 2026-11-19 08:03:30.284.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.019 (0.020) seconds
+Test Suite 'BenchPreferencesTests' started at 2026-11-19 08:03:30.284.
+Test Case '-[PiranhasCoreTests.BenchPreferencesTests testRoundTripThroughDefaults]' started.
+Test Case '-[PiranhasCoreTests.BenchPreferencesTests testRoundTripThroughDefaults]' passed (0.005 seconds).
+Test Case '-[PiranhasCoreTests.BenchPreferencesTests testSanitizeKeepsWholeCentsForValidGeo]' started.
+Test Case '-[PiranhasCoreTests.BenchPreferencesTests testSanitizeKeepsWholeCentsForValidGeo]' passed (0.001 seconds).
+Test Suite 'BenchPreferencesTests' passed at 2026-11-19 08:03:30.290.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.006 (0.006) seconds
+Test Suite 'PayloadValidatorTests' started at 2026-11-19 08:03:30.290.
+Test Case '-[PiranhasCoreTests.PayloadValidatorTests testAcceptsValidPayload]' started.
+Test Case '-[PiranhasCoreTests.PayloadValidatorTests testAcceptsValidPayload]' passed (0.003 seconds).
+Test Case '-[PiranhasCoreTests.PayloadValidatorTests testMapsScriptErrors]' started.
+Test Case '-[PiranhasCoreTests.PayloadValidatorTests testMapsScriptErrors]' passed (0.002 seconds).
+Test Case '-[PiranhasCoreTests.PayloadValidatorTests testRejectsHTMLAndMissingRows]' started.
+Test Case '-[PiranhasCoreTests.PayloadValidatorTests testRejectsHTMLAndMissingRows]' passed (0.002 seconds).
+Test Suite 'PayloadValidatorTests' passed at 2026-11-19 08:03:30.298.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.007 (0.008) seconds
+Test Suite 'SnapshotStoreTests' started at 2026-11-19 08:03:30.298.
+Test Case '-[PiranhasCoreTests.SnapshotStoreTests testRefreshPolicy]' started.
+Test Case '-[PiranhasCoreTests.SnapshotStoreTests testRefreshPolicy]' passed (0.000 seconds).
+Test Case '-[PiranhasCoreTests.SnapshotStoreTests testRoundTrip]' started.
+Test Case '-[PiranhasCoreTests.SnapshotStoreTests testRoundTrip]' passed (0.007 seconds).
+Test Suite 'SnapshotStoreTests' passed at 2026-11-19 08:03:30.306.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.008 (0.008) seconds
+Test Suite 'SourceSettingsTests' started at 2026-11-19 08:03:30.306.
+Test Case '-[PiranhasCoreTests.SourceSettingsTests testBuildsURLWithKey]' started.
+Test Case '-[PiranhasCoreTests.SourceSettingsTests testBuildsURLWithKey]' passed (0.001 seconds).
+Test Case '-[PiranhasCoreTests.SourceSettingsTests testRejectsHTTPAndGarbage]' started.
+Test Case '-[PiranhasCoreTests.SourceSettingsTests testRejectsHTTPAndGarbage]' passed (0.000 seconds).
+Test Case '-[PiranhasCoreTests.SourceSettingsTests testReplacesExistingKey]' started.
+Test Case '-[PiranhasCoreTests.SourceSettingsTests testReplacesExistingKey]' passed (0.001 seconds).
+Test Suite 'SourceSettingsTests' passed at 2026-11-19 08:03:30.308.
+	 Executed 3 tests, with 0 failures (0 unexpected) in 0.002 (0.002) seconds
+Test Suite 'PiranhasDashboardPackageTests.xctest' passed at 2026-11-19 08:03:30.308.
+	 Executed 12 tests, with 0 failures (0 unexpected) in 0.041 (0.044) seconds
+Test Suite 'All tests' passed at 2026-11-19 08:03:30.308.
+	 Executed 12 tests, with 0 failures (0 unexpected) in 0.041 (0.047) seconds
+◇ Test run started.
+↳ Testing Library Version: 124.4
+↳ Target Platform: x86_64-apple-macos14.0
+✔ Test run with 0 tests passed after 0.001 seconds.

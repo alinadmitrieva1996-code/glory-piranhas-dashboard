@@ -1,0 +1,103 @@
+0%: Compute target dependency graph
+Building targets in dependency order
+Target dependency graph (3 targets)
+0%: Gather provisioning inputs
+0%: Create build description
+0%: Discovering version info for swiftc
+0%: Discovering version info for clang
+0%: Discovering version info for ld
+Build description signature: ff1dac5c374f4b5e5bae575fdb19630f
+
+Build description path: /Users/runner/work/glory-piranhas-dashboard/glory-piranhas-dashboard/macos/.build/apple/Intermediates.noindex/XCBuildData/ff1dac5c374f4b5e5bae575fdb19630f.xcbuilddata
+
+0%: Create build directory $(TARGET_BUILD_DIR)
+0%: Create build directory $(OBJROOT)
+0%: Build stat cache for /Applications/Xcode_16.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.5.sdk
+0%: Create build directory $(OBJROOT)/EagerLinkingTBDs/Release
+0%: Create build directory $(TARGET_BUILD_DIR)/Release
+0%: Create build directory $(TARGET_BUILD_DIR)/Release/PackageFrameworks
+0%: Write PiranhasDashboard.DependencyMetadataFileList
+0%: Write PiranhasDashboard.DependencyStaticMetadataFileList
+0%: Write PiranhasDashboard_const_extract_protocols.json (x86_64)
+0%: Write PiranhasDashboard.SwiftFileList (x86_64)
+0%: Write PiranhasDashboard.LinkFileList (x86_64)
+0%: Write PiranhasDashboard-OutputFileMap.json (x86_64)
+0%: Write PiranhasDashboard_const_extract_protocols.json (arm64)
+0%: Write PiranhasDashboard.SwiftFileList (arm64)
+0%: Write PiranhasDashboard.LinkFileList (arm64)
+0%: Write PiranhasDashboard-OutputFileMap.json (arm64)
+0%: Write PiranhasCore_Module.DependencyStaticMetadataFileList
+0%: Write PiranhasCore_Module.DependencyMetadataFileList
+0%: Write PiranhasCore.modulemap
+0%: Write PiranhasCore_Module_const_extract_protocols.json (x86_64)
+0%: Write PiranhasCore_Module.SwiftFileList (x86_64)
+0%: Write PiranhasCore_Module.SwiftConstValuesFileList
+0%: Write PiranhasCore_Module.LinkFileList (x86_64)
+0%: Write PiranhasCore_Module-OutputFileMap.json (x86_64)
+0%: Write PiranhasCore_Module_const_extract_protocols.json (arm64)
+0%: Write PiranhasCore_Module.SwiftFileList (arm64)
+0%: Write PiranhasCore_Module.SwiftConstValuesFileList
+0%: Write PiranhasCore_Module.LinkFileList (arm64)
+0%: Write PiranhasCore_Module-OutputFileMap.json (arm64)
+0%: Copy PiranhasCore.modulemap
+46%: Planning Swift module PiranhasCore (arm64)
+46%: Planning Swift module PiranhasCore (x86_64)
+47%: Compile PiranhasCore_Module (arm64)
+47%: Compile PiranhasCore_Module (x86_64)
+47%: Compiling AlarmPreferences.swift, BenchPreferences.swift, DataClient.swift, SnapshotStore.swift, SourceSettings.swift
+47%: Compiling AlarmPreferences.swift, BenchPreferences.swift, DataClient.swift, SnapshotStore.swift, SourceSettings.swift
+47%: Compile 5 Swift source files (x86_64)
+47%: Compile 5 Swift source files (arm64)
+51%: Discovering Swift tasks after 'Compiling AlarmPreferences.swift, BenchPreferences.swift, DataClient.swift, SnapshotStore.swift, SourceSettings.swift'
+51%: Unblock downstream dependents of PiranhasCore_Module (x86_64)
+51%: Copy PiranhasCore.abi.json (x86_64)
+51%: Copy PiranhasCore.swiftmodule (x86_64)
+51%: Copy PiranhasCore.swiftdoc (x86_64)
+51%: Copy PiranhasCore.swiftsourceinfo (x86_64)
+51%: Discovering Swift tasks after 'Compiling AlarmPreferences.swift, BenchPreferences.swift, DataClient.swift, SnapshotStore.swift, SourceSettings.swift'
+51%: Unblock downstream dependents of PiranhasCore_Module (arm64)
+51%: Merge Objective-C generated interface headers
+51%: Copy PiranhasCore.swiftmodule (arm64)
+51%: Copy PiranhasCore.swiftdoc (arm64)
+51%: Copy PiranhasCore.abi.json (arm64)
+51%: Copy PiranhasCore.swiftsourceinfo (arm64)
+51%: Link PiranhasCore_Module.o (x86_64)
+51%: Link PiranhasCore_Module.o (arm64)
+51%: Planning Swift module PiranhasDashboard (arm64)
+51%: Planning Swift module PiranhasDashboard (x86_64)
+51%: Compile PiranhasDashboard (x86_64)
+51%: Compiling AppModel.swift, ContentView.swift, DashboardWebView.swift, Keychain.swift, PiranhasDashboardApp.swift, SettingsView.swift
+51%: Compiling AppModel.swift, ContentView.swift, DashboardWebView.swift, Keychain.swift, PiranhasDashboardApp.swift, SettingsView.swift
+51%: Compile PiranhasDashboard (arm64)
+73%: Create universal binary PiranhasCore_Module.o
+73%: Extract app intents metadata
+73%: Compile 6 Swift source files (arm64)
+73%: Compile 6 Swift source files (x86_64)
+2026-11-19 08:03:58.775 appintentsmetadataprocessor[11671:34875] Starting appintentsmetadataprocessor export
+2026-11-19 08:03:59.055 appintentsmetadataprocessor[11671:34875] Extracted no relevant App Intents symbols, skipping writing output
+
+77%: Register execution policy exception for PiranhasCore_Module.o
+79%: Discovering Swift tasks after 'Compiling AppModel.swift, ContentView.swift, DashboardWebView.swift, Keychain.swift, PiranhasDashboardApp.swift, SettingsView.swift'
+79%: Unblock downstream dependents of PiranhasDashboard (x86_64)
+79%: Copy PiranhasDashboard.swiftdoc (x86_64)
+79%: Link PiranhasDashboard (x86_64)
+79%: Copy PiranhasDashboard.swiftmodule (x86_64)
+79%: Copy PiranhasDashboard.abi.json (x86_64)
+79%: Copy PiranhasDashboard.swiftsourceinfo (x86_64)
+87%: Discovering Swift tasks after 'Compiling AppModel.swift, ContentView.swift, DashboardWebView.swift, Keychain.swift, PiranhasDashboardApp.swift, SettingsView.swift'
+87%: Unblock downstream dependents of PiranhasDashboard (arm64)
+87%: Link PiranhasDashboard (arm64)
+87%: Copy PiranhasDashboard.swiftmodule (arm64)
+87%: Copy PiranhasDashboard.swiftdoc (arm64)
+87%: Copy PiranhasDashboard.abi.json (arm64)
+87%: Copy PiranhasDashboard.swiftsourceinfo (arm64)
+95%: Create universal binary PiranhasDashboard
+95%: Generate PiranhasDashboard.dSYM for PiranhasDashboard
+98%: Register execution policy exception for PiranhasDashboard
+100%: Build succeeded
+Build complete!
+/Users/runner/work/glory-piranhas-dashboard/glory-piranhas-dashboard/dist/Дашборд байеры.app/Contents/Info.plist: OK
+/Users/runner/work/glory-piranhas-dashboard/glory-piranhas-dashboard/dist/Дашборд байеры.app: valid on disk
+/Users/runner/work/glory-piranhas-dashboard/glory-piranhas-dashboard/dist/Дашборд байеры.app: satisfies its Designated Requirement
+Architectures in the fat file: /Users/runner/work/glory-piranhas-dashboard/glory-piranhas-dashboard/dist/Дашборд байеры.app/Contents/MacOS/PiranhasDashboard are: x86_64 arm64 
+Готово: /Users/runner/work/glory-piranhas-dashboard/glory-piranhas-dashboard/dist/Дашборд байеры.app (версия 0.3.4, сборка 10)
