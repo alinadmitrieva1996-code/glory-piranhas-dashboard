@@ -5,7 +5,7 @@ import { dayShort, money0, money2, monthName } from '../src/domain/format.ts';
 import { applyBenches, buildModel, lastFilledDay, normalize, overpayCents, reportDay, sumLines } from '../src/domain/metrics.ts';
 import { cpdCents, toCents } from '../src/domain/money.ts';
 import { parsePayload } from '../src/domain/parse.ts';
-import { cpdStatus, worst, yesterdayMsk } from '../src/domain/status.ts';
+import { cpdStatus, freshness, worst, yesterdayMsk } from '../src/domain/status.ts';
 import type { SheetRow } from '../src/domain/types.ts';
 
 const row = (buyer: string, date: string, geo: string, spend: number, ftd: number, regs = 0): SheetRow => ({ buyer, date, geo, clicks: 0, regs, ftd, spend });
@@ -154,6 +154,19 @@ describe('cpdStatus', () => {
   it('worst выбирает худший статус', () => {
     assert.equal(worst('ok', 'warn'), 'warn');
     assert.equal(worst('bad', 'none'), 'bad');
+  });
+});
+
+describe('свежесть данных', () => {
+  const now = new Date('2026-11-19T07:22:00Z'); // 10:22 МСК 19 ноября
+  it('последний день 17-е, а вчера 18-е — «вчера» не пишем и предупреждаем', () => {
+    assert.deepEqual(freshness('2026-11-17', now), { yesterday: '2026-11-18', isYesterday: false, yesterdayMissing: true });
+  });
+  it('последний день и есть вчера', () => {
+    assert.deepEqual(freshness('2026-11-18', now), { yesterday: '2026-11-18', isYesterday: true, yesterdayMissing: false });
+  });
+  it('нет данных вовсе', () => {
+    assert.equal(freshness(null, now).yesterdayMissing, true);
   });
 });
 

@@ -3,7 +3,7 @@ import { ALARM_DEFS, type AlarmResult, type AlarmSeverity, evaluateAlarms, resol
 import { dayMedium, int, money0, money2, monthName, pct, rangeShort, timeLabel } from '../domain/format.ts';
 import { applyBenches, buildModel, sumLines } from '../domain/metrics.ts';
 import { parsePayload } from '../domain/parse.ts';
-import { cpdStatus, worst } from '../domain/status.ts';
+import { cpdStatus, freshness, worst } from '../domain/status.ts';
 import type { BuyerSummary, DashboardModel, GeoConfig, GeoSummary, SheetRow, StatusLevel, Totals } from '../domain/types.ts';
 import { renderChart } from './chart.ts';
 import { h } from './dom.ts';
@@ -221,6 +221,13 @@ export class DashboardApp {
     }
     const err = this.meta.error ?? this.dataError;
     if (err) out.push(h('div', { class: 'note note-bad', role: 'alert' }, icon('info'), h('span', {}, h('b', {}, 'Не удалось обновить. '), err)));
+    const fr = freshness(model?.lastDay ?? null, new Date());
+    // Вчера целиком не внесено (не путать с частичным днём — о нём следующая плашка).
+    if (model?.lastDay && fr.yesterdayMissing && model.partial?.date !== fr.yesterday) {
+      out.push(
+        h('div', { class: 'note note-warn', role: 'status' }, icon('info'), h('span', {}, h('b', {}, `За ${dayMedium(fr.yesterday)} данных ещё нет`), ` — показываем ${dayMedium(model.lastDay)}, последний внесённый день.`)),
+      );
+    }
     if (model?.partial) {
       const p = model.partial;
       out.push(h('div', { class: 'note note-warn', role: 'status' }, icon('info'), h('span', {}, h('b', {}, `${dayMedium(p.date)} внесли ${p.entered} из ${p.expected} байеров`), ` — показываем ${Number(model.lastDay?.slice(8, 10))}-е.`)));
@@ -308,6 +315,11 @@ export class DashboardApp {
     return h('div', { class: 'insight' }, icon('sparkle'), h('span', {}, h('b', {}, head), tail ? ' ' + tail : ''));
   }
 
+  /** «Вчера», только если отчётный день и правда вчерашний; иначе «Последний день». */
+  private dayTitle(model: DashboardModel): string {
+    return freshness(model.lastDay, new Date()).isYesterday ? 'Вчера' : 'Последний день';
+  }
+
   private kpi(label: string, value: string, valueClass: string, sub: (Node | string)[]): HTMLElement {
     return h('div', { class: 'kpi' }, h('span', { class: 'kpi-label' }, label), h('span', { class: `kpi-value ${valueClass}` }, value), h('span', { class: 'kpi-sub' }, ...sub));
   }
@@ -320,7 +332,7 @@ export class DashboardApp {
     const yesterday = h(
       'article',
       { class: 'card card-hero' },
-      h('div', { class: 'card-head' }, h('h2', {}, 'Вчера'), h('span', { class: 'muted' }, dayMedium(model.lastDay))),
+      h('div', { class: 'card-head' }, h('h2', {}, this.dayTitle(model)), h('span', { class: 'muted' }, dayMedium(model.lastDay))),
       h(
         'div',
         { class: 'card-cols' },
@@ -388,7 +400,7 @@ export class DashboardApp {
     const head = h(
       'thead',
       {},
-      h('tr', {}, h('th', { scope: 'col', rowspan: 2 }, 'Байер'), h('th', { scope: 'col', rowspan: 2 }, 'Статус'), h('th', { scope: 'colgroup', colspan: 3, class: 'grp' }, `Вчера · ${dayMedium(model.lastDay)}`), h('th', { scope: 'colgroup', colspan: 5, class: 'grp' }, monthName(model.month)), h('th', { scope: 'col', rowspan: 2, class: 'sep' }, 'Спенд 7 дней')),
+      h('tr', {}, h('th', { scope: 'col', rowspan: 2 }, 'Байер'), h('th', { scope: 'col', rowspan: 2 }, 'Статус'), h('th', { scope: 'colgroup', colspan: 3, class: 'grp' }, `${this.dayTitle(model)} · ${dayMedium(model.lastDay)}`), h('th', { scope: 'colgroup', colspan: 5, class: 'grp' }, monthName(model.month)), h('th', { scope: 'col', rowspan: 2, class: 'sep' }, 'Спенд 7 дней')),
       h('tr', {}, th('Спенд', 'num sep'), th('FTD', 'num'), th('CPD', 'num'), th('Спенд', 'num sep'), th('Доля', 'num'), th('CPD', 'num'), th('Reg→FTD', 'num'), th('Переплата', 'num')),
     );
     const body = h('tbody');
